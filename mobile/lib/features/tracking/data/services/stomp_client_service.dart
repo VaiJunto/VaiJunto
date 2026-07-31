@@ -1,0 +1,80 @@
+import 'dart:convert';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:stomp_dart_client/stomp_dart_client.dart';
+import '../../../../core/storage/secure_storage.dart';
+import '../../../../core/models/location_model.dart';
+
+final stompClientProvider = Provider<StompClientService>((ref) {
+  final secureStorage = ref.watch(secureStorageProvider);
+  return StompClientService(secureStorage);
+});
+
+class StompClientService {
+  final SecureStorage _secureStorage;
+  StompClient? _stompClient;
+  
+  Function(LocationModel)? onLocationReceived;
+
+  // Use 10.0.2.2 para emuladores Android
+  static const String wsUrl = 'ws://10.0.2.2:8080/ws-tracking';
+
+  StompClientService(this._secureStorage);
+
+  Future<void> connect(String tripId) async {
+    final token = await _secureStorage.getToken();
+    if (token == null) return;
+
+    _stompClient = StompClient(
+      config: StompConfig.SockJS(
+        url: wsUrl,
+        stompConnectHeaders: {'Authorization': 'Bearer $token'},
+        webSocketConnectHeaders: {'Authorization': 'Bearer $token'},
+        onConnect: (StompFrame frame) {
+          _subscribeToTrip(tripId);
+        },
+        onWebSocketError: (dynamic error) => print(error.toString()),
+      ),
+    );
+
+    _stompClient?.activate();
+  }
+
+  void _subscribeToTrip(String tripId) {
+    _stompClient?.subscribe(
+      destination: '/topic/trips/$tripId/tracking',
+      callback: (StompFrame frame) {
+        if (frame.body != null) {
+          final result = json.decode(frame.body!);
+          final location = LocationModel(
+            latitude: (result['latitude'] as num).toDouble(),
+            longitude: (result['longitude'] as num).toDouble(),
+          );
+          if (onLocationReceived != null) {
+            onLocationReceived!(location);
+          }
+        }
+      },
+    );
+  }
+
+  void sendLocationUpdate(String tripId, double lat, double lon, double speed, double heading) {
+    if (_stompClient != null && _stompClient!.isActive) {
+      final payload = json.encode({
+        'tripInstanceId': tripId,
+        'latitude': lat,
+        'longitude': lon,
+        'speed': speed,
+        'heading': heading,
+      });
+
+      _stompClient?.send(
+        destination: '/app/tracking/update',
+        body: payload,
+      );
+    }
+  }
+
+  void disconnect() {
+    _stompClient?.deactivate();
+  }
+}
