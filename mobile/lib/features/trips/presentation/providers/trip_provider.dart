@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../data/models/trip_passenger_model.dart';
-import '../data/repositories/trip_repository.dart';
+import '../../data/models/trip_passenger_model.dart';
+import '../../data/repositories/trip_repository.dart';
 
 final tripPassengersProvider = FutureProvider.family<List<TripPassengerModel>, String>((ref, tripId) async {
   final repository = ref.watch(tripRepositoryProvider);

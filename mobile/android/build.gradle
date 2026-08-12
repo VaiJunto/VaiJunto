@@ -1,0 +1,26 @@
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+// Compatibility shim: some plugins' build.gradle reference the legacy
+// rootProject.ext.flutter map instead of the new per-module FlutterExtension.
+ext.flutter = [
+    compileSdkVersion: 36,
+    minSdkVersion: 23,
+    targetSdkVersion: 36,
+]
+
+rootProject.buildDir = "../build"
+subprojects {
+    project.buildDir = "${rootProject.buildDir}/${project.name}"
+}
+subprojects {
+    project.evaluationDependsOn(":app")
+}
+
+tasks.register("clean", Delete) {
+    delete rootProject.buildDir
+}

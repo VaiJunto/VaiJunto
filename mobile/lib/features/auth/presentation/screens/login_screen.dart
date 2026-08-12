@@ -81,7 +81,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   : ElevatedButton(
                       onPressed: _submit,
                       style: ElevatedButton.styleFrom(
-                        minimumSize: const Size.infinity,
+                        minimumSize: const Size.fromHeight(48),
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
                       child: const Text('ENTRAR', style: TextStyle(fontSize: 16)),

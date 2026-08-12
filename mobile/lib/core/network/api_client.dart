@@ -11,8 +11,9 @@ class ApiClient {
   late final Dio dio;
   final SecureStorage _secureStorage;
 
-  // Utilize um IP configurável, para emuladores Android use 10.0.2.2
-  static const String baseUrl = 'http://10.0.2.2:8080/api/v1';
+  // Dispositivo físico via USB: requer `adb reverse tcp:8080 tcp:8080`.
+  // Em emulador Android, troque para http://10.0.2.2:8080/api/v1.
+  static const String baseUrl = 'http://127.0.0.1:8080/api/v1';
 
   ApiClient(this._secureStorage) {
     dio = Dio(BaseOptions(
