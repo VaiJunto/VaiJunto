@@ -50,27 +50,33 @@ class NeoBadge extends StatelessWidget {
     required this.child,
     this.color,
     this.rotation = 0,
+    this.foregroundColor,
   });
 
   final Widget child;
   final Color? color;
   final double rotation;
+  final Color? foregroundColor;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
+    final background = color ?? scheme.surface;
+    final foreground = foregroundColor ??
+        (background == scheme.surface ? scheme.ink : Colors.white);
+
     final badge = Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: NeoBrutal.decoration(
-        color: color ?? scheme.surface,
+        color: background,
         borderColor: scheme.ink,
         radius: 999,
         offset: NeoBrutal.shadowOffsetSmall,
       ),
       child: DefaultTextStyle(
         style: TextStyle(
-          color: scheme.ink,
+          color: foreground,
           fontSize: 11,
           fontWeight: FontWeight.w800,
           letterSpacing: 0.6,

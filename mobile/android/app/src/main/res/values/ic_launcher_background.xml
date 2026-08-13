@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tinta. O cartao roxo vem no primeiro plano; este fundo e o que sobra na
+         borda da mascara, formando contorno e sombra dura. -->
+    <color name="ic_launcher_background">#0E0D14</color>
+</resources>

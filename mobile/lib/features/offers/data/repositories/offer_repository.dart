@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/models/location_model.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/network/api_datetime.dart';
 import '../models/offer_model.dart';
 
 final offerRepositoryProvider = Provider<OfferRepository>((ref) {
@@ -13,7 +14,8 @@ class OfferRepository {
 
   OfferRepository(this._dio);
 
-  Future<List<OfferModel>> getNearbyOffers(double lat, double lon, {double distance = 5000}) async {
+  Future<List<OfferModel>> getNearbyOffers(double lat, double lon,
+      {double distance = 5000}) async {
     try {
       final response = await _dio.get(
         '/offers/nearby',
@@ -42,6 +44,7 @@ class OfferRepository {
     required int availableSeats,
     required double price,
     required DateTime departureAt,
+    required bool isFixed,
   }) async {
     final response = await _dio.post(
       '/offers',
@@ -52,10 +55,10 @@ class OfferRepository {
         'destinationName': destinationName,
         'destinationLocation': destinationLocation.toJson(),
         'departureTime': _formatTimeOfDay(departureAt),
-        'isRecurrent': false,
+        'isRecurrent': isFixed,
         'availableSeats': availableSeats,
         'price': price,
-        'departureAt': departureAt.toIso8601String(),
+        'departureAt': formatApiDateTime(departureAt),
       },
     );
 

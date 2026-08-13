@@ -27,10 +27,12 @@ class AddressAutocompleteField extends ConsumerStatefulWidget {
   final ValueChanged<GeocodingResult?> onSelected;
 
   @override
-  ConsumerState<AddressAutocompleteField> createState() => _AddressAutocompleteFieldState();
+  ConsumerState<AddressAutocompleteField> createState() =>
+      _AddressAutocompleteFieldState();
 }
 
-class _AddressAutocompleteFieldState extends ConsumerState<AddressAutocompleteField> {
+class _AddressAutocompleteFieldState
+    extends ConsumerState<AddressAutocompleteField> {
   final _controller = TextEditingController();
   Timer? _debounce;
   List<GeocodingResult> _results = [];
@@ -56,7 +58,8 @@ class _AddressAutocompleteFieldState extends ConsumerState<AddressAutocompleteFi
       return;
     }
 
-    _debounce = Timer(const Duration(milliseconds: 600), () => _search(query.trim()));
+    _debounce =
+        Timer(const Duration(milliseconds: 600), () => _search(query.trim()));
   }
 
   Future<void> _search(String query) async {
@@ -88,7 +91,8 @@ class _AddressAutocompleteFieldState extends ConsumerState<AddressAutocompleteFi
     final theme = Theme.of(context);
 
     return FormField<GeocodingResult>(
-      validator: (_) => _selected == null ? 'Busque e selecione um endereço da lista' : null,
+      validator: (_) =>
+          _selected == null ? 'Busque e selecione um endereço da lista' : null,
       builder: (field) {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -109,7 +113,10 @@ class _AddressAutocompleteFieldState extends ConsumerState<AddressAutocompleteFi
                         ),
                       )
                     : (_selected != null
-                        ? Icon(Icons.check_circle_rounded, color: Colors.green.shade600)
+                        ? const Icon(
+                            Icons.check_circle_rounded,
+                            color: NeoBrutal.lime,
+                          )
                         : null),
               ),
               onChanged: (value) {
@@ -130,22 +137,47 @@ class _AddressAutocompleteFieldState extends ConsumerState<AddressAutocompleteFi
                   shrinkWrap: true,
                   padding: EdgeInsets.zero,
                   itemCount: _results.length,
-                  separatorBuilder: (_, __) => Divider(height: 1, color: theme.colorScheme.ink),
+                  separatorBuilder: (_, __) =>
+                      Divider(height: 1, color: theme.colorScheme.ink),
                   itemBuilder: (context, index) {
                     final result = _results[index];
-                    return ListTile(
-                      dense: true,
-                      leading: Icon(Icons.place_rounded, color: theme.colorScheme.primary),
-                      title: Text(
-                        result.displayName,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall,
-                      ),
+                    return GestureDetector(
+                      behavior: HitTestBehavior.opaque,
                       onTap: () {
                         _select(result);
                         field.didChange(result);
                       },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 11,
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 30,
+                              height: 30,
+                              color: theme.colorScheme.primary,
+                              alignment: Alignment.center,
+                              child: const Icon(
+                                Icons.place_rounded,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                            ),
+                            const SizedBox(width: 11),
+                            Expanded(
+                              child: Text(
+                                result.displayName,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodySmall,
+                              ),
+                            ),
+                            const Icon(Icons.north_east_rounded, size: 16),
+                          ],
+                        ),
+                      ),
                     );
                   },
                 ),

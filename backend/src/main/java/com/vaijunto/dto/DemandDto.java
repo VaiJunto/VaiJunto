@@ -14,6 +14,7 @@ import java.util.UUID;
 public class DemandDto {
     private UUID id;
     private UUID passengerId;
+    private String passengerName;
     private String originName;
     private LocationDto originLocation;
     private String destinationName;

@@ -1,30 +1,231 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:mobile/main.dart';
+import 'package:vaijunto/core/app_version.dart';
+import 'package:vaijunto/core/theme/neo_brutal_theme.dart';
+import 'package:vaijunto/core/ui/neo_bottom_nav_bar.dart';
+import 'package:vaijunto/core/ui/neo_button.dart';
+import 'package:vaijunto/core/ui/neo_street_backdrop.dart';
+import 'package:vaijunto/features/auth/data/models/user_model.dart';
+import 'package:vaijunto/features/auth/presentation/screens/login_screen.dart';
+import 'package:vaijunto/features/auth/presentation/screens/register_screen.dart';
+import 'package:vaijunto/features/auth/presentation/widgets/password_requirements.dart';
+import 'package:vaijunto/features/home/presentation/screens/home_screen.dart';
+import 'package:vaijunto/features/demands/presentation/providers/demand_provider.dart';
+import 'package:vaijunto/features/offers/presentation/providers/offer_provider.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('navbar exibe e seleciona todas as abas', (tester) async {
+    var selectedIndex = 1;
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildNeoBrutalTheme(Brightness.light),
+        home: StatefulBuilder(
+          builder: (context, setState) {
+            return Scaffold(
+              bottomNavigationBar: NeoBottomNavBar(
+                currentIndex: selectedIndex,
+                onSelected: (index) => setState(() => selectedIndex = index),
+                destinations: const [
+                  NeoBottomNavDestination(
+                      icon: Icons.route_rounded, label: 'Caronas'),
+                  NeoBottomNavDestination(
+                      icon: Icons.add_box_outlined, label: 'Criar'),
+                  NeoBottomNavDestination(
+                      icon: Icons.forum_rounded, label: 'Chat'),
+                  NeoBottomNavDestination(
+                      icon: Icons.tune_rounded, label: 'Ajustes'),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
+    expect(find.text('CARONAS'), findsOneWidget);
+    expect(find.text('CRIAR'), findsOneWidget);
+    expect(find.text('CHAT'), findsOneWidget);
+    expect(find.text('AJUSTES'), findsOneWidget);
+
+    await tester.tap(find.text('CHAT'));
+    await tester.pumpAndSettle();
+
+    expect(selectedIndex, 2);
+  });
+
+  testWidgets('área autenticada não estoura em largura de celular',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          nearbyOffersProvider.overrideWith((ref, location) async => []),
+          nearbyDemandsProvider.overrideWith((ref, location) async => []),
+        ],
+        child: MaterialApp(
+          theme: buildNeoBrutalTheme(Brightness.light),
+          builder: _disableAnimations,
+          home: HomeScreen(
+            user: UserModel(
+              id: 'layout-test',
+              name: 'Gabriel Silva',
+              email: 'gabriel.silva@fatec.sp.gov.br',
+              profileTypes: const ['PASSENGER'],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.text('CRIAR').last);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('CONTINUAR'), findsOneWidget);
+    expect(tester.getBottomRight(find.text('CONTINUAR')).dy, lessThan(760));
+
+    for (final tab in ['CHAT', 'AJUSTES', 'CARONAS']) {
+      await tester.tap(find.text(tab).last);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    }
+  });
+
+  testWidgets('login e cadastro cabem na primeira viewport do celular',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: buildNeoBrutalTheme(Brightness.dark),
+          builder: _disableAnimations,
+          home: const LoginScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('ENTRAR'), findsNWidgets(2));
+    expect(find.textContaining('CRIAR CONTA'), findsOneWidget);
+    expect(find.text('V $kAppVersion'), findsOneWidget);
+    expect(
+      tester.getBottomRight(find.textContaining('CRIAR CONTA')).dy,
+      lessThan(830),
+    );
+
+    await tester.tap(find.textContaining('CRIAR CONTA'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('CONTINUAR'), findsNothing);
+    expect(find.textContaining('VAN/FRETADO'), findsNothing);
+    expect(find.byType(TextFormField), findsNWidgets(3));
+    expect(find.text('V $kAppVersion'), findsOneWidget);
+    expect(find.text('COMECE A DIGITAR'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextFormField).last, 'Abcdefg1');
+    await tester.pump();
+    expect(find.text('PRONTA'), findsOneWidget);
+    final createButton = find.ancestor(
+      of: find.text('CRIAR CONTA'),
+      matching: find.byType(NeoButton),
+    );
+    expect(
+      find.descendant(
+        of: createButton,
+        matching: find.byIcon(Icons.arrow_forward_rounded),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      tester
+          .getBottomRight(
+            find.descendant(
+              of: createButton,
+              matching: find.text('CRIAR CONTA'),
+            ),
+          )
+          .dy,
+      lessThan(830),
+    );
+  });
+
+  test('mapa vivo normaliza o fim para o início do ciclo', () {
+    expect(neoLoopProgress(0), 0);
+    expect(neoLoopProgress(1), 0);
+    expect(neoLoopProgress(12), 0);
+    expect(neoLoopProgress(1.25), closeTo(0.25, 0.000001));
+  });
+
+  testWidgets('teclado nao empurra o login e revela os requisitos da senha',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetViewInsets);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: buildNeoBrutalTheme(Brightness.dark),
+          builder: _disableAnimations,
+          home: const LoginScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final createAccount = find.textContaining('CRIAR CONTA');
+    final createAccountTop = tester.getTopLeft(createAccount).dy;
+    tester.view.viewInsets = const FakeViewPadding(bottom: 320);
     await tester.pump();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(
+      tester.getTopLeft(createAccount).dy,
+      closeTo(createAccountTop, 0.1),
+    );
+
+    tester.view.resetViewInsets();
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: buildNeoBrutalTheme(Brightness.dark),
+          builder: _disableAnimations,
+          home: const RegisterScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    tester.view.viewInsets = const FakeViewPadding(bottom: 320);
+    await tester.tap(find.byType(TextFormField).last);
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+
+    const keyboardTop = 844.0 - 320.0;
+    expect(
+      tester.getBottomRight(find.byType(PasswordRequirements)).dy,
+      lessThan(keyboardTop),
+    );
+    expect(tester.takeException(), isNull);
   });
+}
+
+Widget _disableAnimations(BuildContext context, Widget? child) {
+  return MediaQuery(
+    data: MediaQuery.of(context).copyWith(disableAnimations: true),
+    child: child!,
+  );
 }

@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/models/location_model.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/network/api_datetime.dart';
 import '../models/demand_model.dart';
 
 final demandRepositoryProvider = Provider<DemandRepository>((ref) {
@@ -13,7 +14,8 @@ class DemandRepository {
 
   DemandRepository(this._dio);
 
-  Future<List<DemandModel>> getNearbyDemands(double lat, double lon, {double distance = 5000}) async {
+  Future<List<DemandModel>> getNearbyDemands(double lat, double lon,
+      {double distance = 5000}) async {
     try {
       final response = await _dio.get(
         '/demands/nearby',
@@ -45,7 +47,7 @@ class DemandRepository {
         'originLocation': originLocation.toJson(),
         'destinationName': destinationName,
         'destinationLocation': destinationLocation.toJson(),
-        'desiredTime': desiredTime.toIso8601String(),
+        'desiredTime': formatApiDateTime(desiredTime),
       },
     );
 

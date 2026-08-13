@@ -5,12 +5,16 @@ import '../../../../core/network/api_exception.dart';
 import '../../data/models/offer_model.dart';
 import '../../data/repositories/offer_repository.dart';
 
-final nearbyOffersProvider = FutureProvider.family<List<OfferModel>, LocationModel>((ref, location) async {
+final nearbyOffersProvider =
+    FutureProvider.family<List<OfferModel>, LocationModel>(
+        (ref, location) async {
   final repository = ref.watch(offerRepositoryProvider);
-  return repository.getNearbyOffers(location.latitude, location.longitude);
+  return repository.getNearbyOffers(location.latitude, location.longitude,
+      distance: 50000);
 });
 
-final createOfferProvider = StateNotifierProvider.autoDispose<CreateOfferNotifier, AsyncValue<OfferModel?>>((ref) {
+final createOfferProvider = StateNotifierProvider.autoDispose<
+    CreateOfferNotifier, AsyncValue<OfferModel?>>((ref) {
   return CreateOfferNotifier(ref.watch(offerRepositoryProvider));
 });
 
@@ -28,6 +32,7 @@ class CreateOfferNotifier extends StateNotifier<AsyncValue<OfferModel?>> {
     required int availableSeats,
     required double price,
     required DateTime departureAt,
+    required bool isFixed,
   }) async {
     state = const AsyncValue.loading();
     try {
@@ -40,6 +45,7 @@ class CreateOfferNotifier extends StateNotifier<AsyncValue<OfferModel?>> {
         availableSeats: availableSeats,
         price: price,
         departureAt: departureAt,
+        isFixed: isFixed,
       );
       state = AsyncValue.data(offer);
     } on DioException catch (e, st) {

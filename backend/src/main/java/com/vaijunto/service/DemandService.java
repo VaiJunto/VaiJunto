@@ -28,6 +28,7 @@ public class DemandService {
 
     private final GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
 
+    @Transactional(readOnly = true)
     public List<DemandDto> findOpenDemandsNearOrigin(double lat, double lon, double distanceMeters) {
         List<Demand> demands = demandRepository.findOpenDemandsNearOrigin(
                 lon, lat, distanceMeters, OffsetDateTime.now()
@@ -63,6 +64,7 @@ public class DemandService {
         return DemandDto.builder()
                 .id(demand.getId())
                 .passengerId(demand.getPassenger().getId())
+                .passengerName(demand.getPassenger().getName())
                 .originName(demand.getOriginName())
                 .originLocation(new LocationDto(demand.getOriginLocation().getY(), demand.getOriginLocation().getX()))
                 .destinationName(demand.getDestinationName())

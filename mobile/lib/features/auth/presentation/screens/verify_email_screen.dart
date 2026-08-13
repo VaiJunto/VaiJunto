@@ -1,21 +1,20 @@
 import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../../../core/network/api_exception.dart';
+import '../../../../core/theme/neo_brutal_theme.dart';
 import '../../../../core/ui/app_snackbar.dart';
 import '../../../../core/ui/neo_button.dart';
-import '../providers/auth_provider.dart';
+import '../../../../core/ui/neo_card.dart';
+import '../../../../core/ui/neo_loading_indicator.dart';
 import '../../data/repositories/auth_repository.dart';
+import '../providers/auth_provider.dart';
+import '../widgets/auth_visual_shell.dart';
 
-/// Confirma o e-mail institucional com o código de 6 dígitos enviado por
-/// e-mail. É empilhada tanto pelo cadastro (código já foi enviado, aqui
-/// [codeAlreadySent] chega `true`) quanto pelo login, quando o backend recusa
-/// por EMAIL_NOT_VERIFIED — nesse caso o código mais recente do usuário pode
-/// ser de um cadastro muito antes (login horas ou dias depois), então em vez
-/// de deixar a pessoa tentar contra um código possivelmente vencido, esta
-/// tela já manda um novo assim que abre.
 class VerifyEmailScreen extends ConsumerStatefulWidget {
   const VerifyEmailScreen({
     super.key,
@@ -79,10 +78,12 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
     setState(() => _isVerifying = true);
     try {
       final repository = ref.read(authRepositoryProvider);
-      final user = await repository.verifyEmail(widget.email, _codeController.text.trim());
+      final user = await repository.verifyEmail(
+        widget.email,
+        _codeController.text.trim(),
+      );
 
       if (!mounted) return;
-      // Confirmar o código JÁ é o login — entra direto, sem passo extra.
       ref.read(authStateProvider.notifier).setAuthenticated(user);
       AppSnackbar.success(context, 'E-mail confirmado! Bem-vindo ao VaiJunto.');
       Navigator.of(context).popUntil((route) => route.isFirst);
@@ -94,9 +95,6 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
     }
   }
 
-  /// [silent] evita o snackbar de sucesso no envio automático ao abrir a tela
-  /// (vindo do bloqueio de login) — só faz sentido comemorar o envio quando a
-  /// pessoa pediu de propósito, tocando em "Reenviar código".
   Future<void> _resend({bool silent = false}) async {
     setState(() => _isResending = true);
     try {
@@ -106,13 +104,14 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
       if (!mounted) return;
       setState(() => _hasFreshCode = true);
       if (!silent) {
-        AppSnackbar.success(context, 'Enviamos um novo código para o seu e-mail.');
+        AppSnackbar.success(
+          context,
+          'Enviamos um novo código para o seu e-mail.',
+        );
       }
       _startCooldown();
     } on DioException catch (e) {
       if (!mounted) return;
-      // RATE_LIMITED pode vir do backend mesmo com o cooldown local ativo
-      // (relógios diferentes) — a mensagem já explica quanto falta esperar.
       AppSnackbar.error(context, ApiException.fromDio(e).message);
     } finally {
       if (mounted) setState(() => _isResending = false);
@@ -122,106 +121,116 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final canResend = !_isResending && _cooldownRemaining <= 0;
-    // Enquanto o envio automático (silencioso) ainda não confirmou que um
-    // código fresco existe, não faz sentido deixar tentar um código: seria
-    // repetir exatamente o cenário que gerou confusão (chutar contra um
-    // código antigo antes do novo sequer ter sido enviado).
     final canSubmit = !_isVerifying && _hasFreshCode;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Confirme seu e-mail')),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.mark_email_read_outlined,
-                    size: 56, color: theme.colorScheme.primary),
-                const SizedBox(height: 20),
-                Text(
-                  _hasFreshCode
-                      ? 'Enviamos um código de 6 dígitos para:'
-                      : 'Confirmando seu e-mail institucional:',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+    return AuthVisualShell(
+      code: 'VJ//EMAIL_HANDSHAKE',
+      title: 'Confirme o sinal',
+      description:
+          'Use os seis dígitos enviados para provar que este endereço institucional é seu.',
+      stepLabel: _hasFreshCode ? 'CÓDIGO ATIVO' : 'SINCRONIZANDO',
+      showBack: true,
+      content: NeoCard(
+        color: scheme.surface,
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    color: _hasFreshCode ? scheme.secondary : scheme.tertiary,
+                    child: Icon(
+                      _hasFreshCode
+                          ? Icons.mark_email_read_outlined
+                          : Icons.outgoing_mail,
+                      color: _hasFreshCode ? Colors.white : NeoBrutal.inkLight,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  widget.email,
-                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 28),
-                if (!_hasFreshCode)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    child: Row(
+                  const SizedBox(width: 11),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                        Text(
+                          _hasFreshCode
+                              ? 'DESTINO CONFIRMADO'
+                              : 'ABRINDO CANAL',
+                          style: theme.textTheme.labelMedium,
                         ),
-                        SizedBox(width: 12),
-                        Text('Enviando código...'),
+                        const SizedBox(height: 2),
+                        Text(
+                          widget.email,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                TextFormField(
-                  controller: _codeController,
-                  enabled: _hasFreshCode,
-                  autofocus: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Código de 6 dígitos',
-                    border: OutlineInputBorder(),
-                    counterText: '',
-                  ),
-                  keyboardType: TextInputType.number,
-                  textAlign: TextAlign.center,
-                  maxLength: 6,
-                  style: const TextStyle(fontSize: 24, letterSpacing: 12, fontWeight: FontWeight.bold),
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  onFieldSubmitted: (_) => _verify(),
-                  validator: (v) => (v == null || v.trim().length != 6)
-                      ? 'Informe os 6 dígitos do código'
-                      : null,
+                ],
+              ),
+              const SizedBox(height: 18),
+              if (!_hasFreshCode) ...[
+                const Center(
+                  child: NeoLoadingIndicator(label: 'ENVIANDO CÓDIGO...'),
                 ),
-                const SizedBox(height: 20),
-                NeoButton(
-                  onPressed: canSubmit ? _verify : null,
-                  child: _isVerifying
-                      ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(strokeWidth: 2.5),
-                        )
-                      : const Text('CONFIRMAR'),
-                ),
-                const SizedBox(height: 16),
-                Center(
-                  child: TextButton(
-                    onPressed: canResend ? () => _resend() : null,
-                    child: _isResending
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Text(
-                            _cooldownRemaining > 0
-                                ? 'Reenviar código em ${_cooldownRemaining}s'
-                                : 'Reenviar código',
-                          ),
-                  ),
-                ),
+                const SizedBox(height: 18),
               ],
-            ),
+              TextFormField(
+                controller: _codeController,
+                enabled: _hasFreshCode,
+                autofocus: _hasFreshCode,
+                decoration: const InputDecoration(
+                  labelText: 'Código de 6 dígitos',
+                  counterText: '',
+                  prefixIcon: Icon(Icons.password_rounded),
+                ),
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.center,
+                maxLength: 6,
+                style: const TextStyle(
+                  fontFamily: 'IBMPlexMono',
+                  fontSize: 23,
+                  letterSpacing: 9,
+                  fontWeight: FontWeight.w700,
+                ),
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                onFieldSubmitted: (_) => _verify(),
+                validator: (value) => value == null || value.trim().length != 6
+                    ? 'Informe os 6 dígitos do código'
+                    : null,
+              ),
+              const SizedBox(height: 16),
+              NeoButton(
+                onPressed: canSubmit ? _verify : null,
+                icon: const Icon(Icons.verified_user_outlined),
+                trailing: _isVerifying ? null : const Icon(Icons.check_rounded),
+                child: _isVerifying
+                    ? const NeoLoadingIndicator(compact: true)
+                    : const Text('CONFIRMAR ACESSO'),
+              ),
+            ],
           ),
         ),
+      ),
+      afterContent: NeoOutlineButton(
+        onPressed: canResend ? () => _resend() : null,
+        icon: const Icon(Icons.refresh_rounded),
+        child: _isResending
+            ? const NeoLoadingIndicator(compact: true)
+            : Text(
+                _cooldownRemaining > 0
+                    ? 'REENVIAR EM ${_cooldownRemaining}s'
+                    : 'REENVIAR CÓDIGO',
+              ),
       ),
     );
   }

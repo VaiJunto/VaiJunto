@@ -16,8 +16,13 @@ public class OfferDto {
     private UUID id;
     private UUID routeId;
     private UUID driverId;
+    private String driverName;
+    private String routeName;
+    private String originName;
+    private String destinationName;
     private Integer availableSeats;
     private BigDecimal price;
     private OffsetDateTime departureAt;
+    private Boolean isRecurrent;
     private OfferStatus status;
 }

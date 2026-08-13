@@ -1,3 +1,5 @@
+import '../../../../core/network/api_datetime.dart';
+
 class TripInstanceModel {
   final String id;
   final String offerId;
@@ -21,7 +23,7 @@ class TripInstanceModel {
       offerId: json['offerId'],
       routeId: json['routeId'],
       driverId: json['driverId'],
-      scheduledDeparture: DateTime.parse(json['scheduledDeparture']),
+      scheduledDeparture: parseApiDateTime(json['scheduledDeparture']),
       status: json['status'],
     );
   }

@@ -1,3 +1,5 @@
+import '../../../../core/network/api_datetime.dart';
+
 class TripPassengerModel {
   final String id;
   final String tripInstanceId;
@@ -22,7 +24,9 @@ class TripPassengerModel {
       passengerId: json['passengerId'],
       passengerName: json['passengerName'],
       status: json['status'],
-      checkedInAt: json['checkedInAt'] != null ? DateTime.parse(json['checkedInAt']) : null,
+      checkedInAt: json['checkedInAt'] != null
+          ? parseApiDateTime(json['checkedInAt'])
+          : null,
     );
   }
 }

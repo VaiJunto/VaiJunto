@@ -5,12 +5,16 @@ import '../../../../core/network/api_exception.dart';
 import '../../data/models/demand_model.dart';
 import '../../data/repositories/demand_repository.dart';
 
-final nearbyDemandsProvider = FutureProvider.family<List<DemandModel>, LocationModel>((ref, location) async {
+final nearbyDemandsProvider =
+    FutureProvider.family<List<DemandModel>, LocationModel>(
+        (ref, location) async {
   final repository = ref.watch(demandRepositoryProvider);
-  return repository.getNearbyDemands(location.latitude, location.longitude);
+  return repository.getNearbyDemands(location.latitude, location.longitude,
+      distance: 50000);
 });
 
-final createDemandProvider = StateNotifierProvider.autoDispose<CreateDemandNotifier, AsyncValue<DemandModel?>>((ref) {
+final createDemandProvider = StateNotifierProvider.autoDispose<
+    CreateDemandNotifier, AsyncValue<DemandModel?>>((ref) {
   return CreateDemandNotifier(ref.watch(demandRepositoryProvider));
 });
 

@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
+
 import '../config/campus.dart';
 import '../theme/neo_brutal_theme.dart';
-import 'neo_button.dart';
 import 'neo_card.dart';
+import 'neo_segmented_control.dart';
 
-/// Toda viagem no app tem a Fatec como origem OU destino — nunca as duas
-/// pontas livres. Este enum decide qual lado fica fixo.
 enum TripDirection { toFatec, fromFatec }
 
-/// Alterna a direção da viagem e mostra o lado fixo (Fatec) por cima do
-/// campo de endereço livre, que fica por conta de quem usa este widget.
+/// Direção da rota em um único controle compacto, seguido do ponto fixo.
 class FatecDirectionSelector extends StatelessWidget {
   const FatecDirectionSelector({
     super.key,
@@ -23,54 +21,65 @@ class FatecDirectionSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final ink = theme.colorScheme.ink;
+    final scheme = theme.colorScheme;
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: NeoButton(
-                height: 48,
-                color: direction == TripDirection.toFatec ? theme.colorScheme.secondary : theme.colorScheme.surface,
-                onPressed: () => onChanged(TripDirection.toFatec),
-                icon: Icon(Icons.login_rounded, size: 18, color: ink),
-                child: const Text('IR P/ FATEC'),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: NeoButton(
-                height: 48,
-                color: direction == TripDirection.fromFatec ? theme.colorScheme.secondary : theme.colorScheme.surface,
-                onPressed: () => onChanged(TripDirection.fromFatec),
-                icon: Icon(Icons.logout_rounded, size: 18, color: ink),
-                child: const Text('SAIR DA FATEC'),
-              ),
-            ),
+        NeoSegmentedControl(
+          selectedIndex: direction == TripDirection.toFatec ? 0 : 1,
+          onSelected: (index) => onChanged(
+            index == 0 ? TripDirection.toFatec : TripDirection.fromFatec,
+          ),
+          segments: const [
+            NeoSegment(label: 'Ir pra Fatec', icon: Icons.south_east_rounded),
+            NeoSegment(label: 'Sair da Fatec', icon: Icons.north_east_rounded),
           ],
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 12),
         NeoCard(
-          color: theme.colorScheme.surface,
-          rotation: -0.015,
+          color: scheme.surface,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          offset: NeoBrutal.shadowOffsetSmall,
           child: Row(
             children: [
-              Icon(Icons.school_rounded, color: theme.colorScheme.primary),
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: scheme.primary,
+                  border: Border.all(color: scheme.ink, width: 2),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+                alignment: Alignment.center,
+                child: const Icon(Icons.school_rounded,
+                    color: Colors.white, size: 20),
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      kFatecName,
-                      style: TextStyle(color: ink, fontWeight: FontWeight.w800),
+                      direction == TripDirection.toFatec
+                          ? 'DESTINO FIXO'
+                          : 'ORIGEM FIXA',
+                      style: TextStyle(
+                        color: scheme.secondary,
+                        fontFamily: 'IBMPlexMono',
+                        fontWeight: FontWeight.w800,
+                        fontSize: 9,
+                        letterSpacing: 0.8,
+                      ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 3),
                     Text(
-                      direction == TripDirection.toFatec ? 'DESTINO' : 'ORIGEM',
-                      style: TextStyle(color: ink.withOpacity(0.7), fontWeight: FontWeight.w700, fontSize: 12, letterSpacing: 0.6),
+                      kFatecName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.ink,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ],
                 ),

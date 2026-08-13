@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:stomp_dart_client/stomp_dart_client.dart';
+import 'package:stomp_dart_client/stomp.dart';
+import 'package:stomp_dart_client/stomp_config.dart';
+import 'package:stomp_dart_client/stomp_frame.dart';
 import '../../../../core/storage/secure_storage.dart';
 import '../../../../core/models/location_model.dart';
 
@@ -12,7 +14,7 @@ final stompClientProvider = Provider<StompClientService>((ref) {
 class StompClientService {
   final SecureStorage _secureStorage;
   StompClient? _stompClient;
-  
+
   Function(LocationModel)? onLocationReceived;
 
   // Use 10.0.2.2 para emuladores Android
@@ -25,7 +27,7 @@ class StompClientService {
     if (token == null) return;
 
     _stompClient = StompClient(
-      config: StompConfig.SockJS(
+      config: StompConfig.sockJS(
         url: wsUrl,
         stompConnectHeaders: {'Authorization': 'Bearer $token'},
         webSocketConnectHeaders: {'Authorization': 'Bearer $token'},
@@ -57,7 +59,8 @@ class StompClientService {
     );
   }
 
-  void sendLocationUpdate(String tripId, double lat, double lon, double speed, double heading) {
+  void sendLocationUpdate(
+      String tripId, double lat, double lon, double speed, double heading) {
     if (_stompClient != null && _stompClient!.isActive) {
       final payload = json.encode({
         'tripInstanceId': tripId,

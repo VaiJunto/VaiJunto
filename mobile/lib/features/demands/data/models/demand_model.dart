@@ -1,8 +1,10 @@
 import '../../../../core/models/location_model.dart';
+import '../../../../core/network/api_datetime.dart';
 
 class DemandModel {
   final String id;
   final String passengerId;
+  final String passengerName;
   final String originName;
   final LocationModel originLocation;
   final String destinationName;
@@ -13,6 +15,7 @@ class DemandModel {
   DemandModel({
     required this.id,
     required this.passengerId,
+    required this.passengerName,
     required this.originName,
     required this.originLocation,
     required this.destinationName,
@@ -25,11 +28,12 @@ class DemandModel {
     return DemandModel(
       id: json['id'],
       passengerId: json['passengerId'],
+      passengerName: json['passengerName'] as String? ?? 'Passageiro',
       originName: json['originName'],
       originLocation: LocationModel.fromJson(json['originLocation']),
       destinationName: json['destinationName'],
       destinationLocation: LocationModel.fromJson(json['destinationLocation']),
-      desiredTime: DateTime.parse(json['desiredTime']),
+      desiredTime: parseApiDateTime(json['desiredTime']),
       status: json['status'],
     );
   }

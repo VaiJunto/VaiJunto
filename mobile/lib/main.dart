@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme/neo_brutal_theme.dart';
+import 'core/ui/neo_card.dart';
+import 'core/ui/neo_loading_indicator.dart';
+import 'core/ui/neo_street_backdrop.dart';
 import 'features/auth/presentation/providers/auth_provider.dart';
 import 'features/auth/presentation/screens/login_screen.dart';
 import 'features/auth/presentation/widgets/vaijunto_logo.dart';
@@ -57,16 +60,83 @@ class _SplashScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            VaiJuntoLogo(),
-            SizedBox(height: 32),
-            CircularProgressIndicator(),
-          ],
-        ),
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return Scaffold(
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          const NeoStreetBackdrop(
+            variant: NeoStreetBackdropVariant.loading,
+          ),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 360),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const VaiJuntoLogo(size: 62),
+                      const SizedBox(height: 28),
+                      NeoCard(
+                        color: scheme.surface,
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  'VJ//LOCAL_BOOT',
+                                  style: theme.textTheme.labelMedium?.copyWith(
+                                    color: scheme.tertiary,
+                                    fontSize: 9,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 7,
+                                    vertical: 4,
+                                  ),
+                                  color: scheme.secondary,
+                                  child: Text(
+                                    'SJC NODE',
+                                    style:
+                                        theme.textTheme.labelMedium?.copyWith(
+                                      color: Colors.white,
+                                      fontSize: 8,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Container(height: 2, color: scheme.ink),
+                            const SizedBox(height: 16),
+                            const NeoBootRail(label: 'RECUPERANDO SUA ROTA'),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'SESSÃO LOCAL • SEM DESVIOS • VAI JUNTO',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                          fontSize: 8,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

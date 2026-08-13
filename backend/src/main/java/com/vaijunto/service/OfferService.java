@@ -35,6 +35,7 @@ public class OfferService {
 
     private final GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
 
+    @Transactional(readOnly = true)
     public List<OfferDto> findActiveOffersNearOrigin(double lat, double lon, double distanceMeters) {
         List<Offer> offers = offerRepository.findActiveOffersNearOrigin(
                 lon, lat, distanceMeters, OffsetDateTime.now()
@@ -90,9 +91,14 @@ public class OfferService {
                 .id(offer.getId())
                 .routeId(offer.getRoute() != null ? offer.getRoute().getId() : null)
                 .driverId(offer.getDriver().getId())
+                .driverName(offer.getDriver().getName())
+                .routeName(offer.getRoute() != null ? offer.getRoute().getName() : null)
+                .originName(offer.getRoute() != null ? offer.getRoute().getOriginName() : null)
+                .destinationName(offer.getRoute() != null ? offer.getRoute().getDestinationName() : null)
                 .availableSeats(offer.getAvailableSeats())
                 .price(offer.getPrice())
                 .departureAt(offer.getDepartureAt())
+                .isRecurrent(offer.getRoute() != null && Boolean.TRUE.equals(offer.getRoute().getIsRecurrent()))
                 .status(offer.getStatus())
                 .build();
     }

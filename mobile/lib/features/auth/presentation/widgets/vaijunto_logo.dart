@@ -26,7 +26,7 @@ class VaiJuntoLogo extends StatelessWidget {
             width: size,
             height: size,
             decoration: NeoBrutal.decoration(
-              color: NeoBrutal.yellow,
+              color: NeoBrutal.ultraviolet,
               borderColor: ink,
               radius: size * 0.22,
             ),

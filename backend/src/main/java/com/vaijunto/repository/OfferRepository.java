@@ -17,7 +17,7 @@ public interface OfferRepository extends JpaRepository<Offer, UUID> {
     @Query(value = "SELECT o.* FROM offers o " +
             "JOIN routes r ON o.route_id = r.id " +
             "WHERE o.status = 'ACTIVE' " +
-            "AND o.departure_at >= :startTime " +
+            "AND (r.is_recurrent = TRUE OR o.departure_at >= :startTime) " +
             "AND ST_DWithin(r.origin_location, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326), :distanceInMeters)",
             nativeQuery = true)
     List<Offer> findActiveOffersNearOrigin(

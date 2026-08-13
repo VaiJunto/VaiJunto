@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fundo roxo de borda a borda: a forma do icone e a mascara do aparelho
+     (squircle no One UI do S23, circulo no Pixel). O primeiro plano traz so a
+     marca, centrada na zona segura de 66dp. -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+    <monochrome android:drawable="@mipmap/ic_launcher_monochrome" />
+</adaptive-icon>

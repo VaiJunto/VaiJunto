@@ -10,7 +10,7 @@ class AppVersionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return NeoBadge(
+    return const NeoBadge(
       rotation: -0.03,
       child: Text('v$kAppVersion'),
     );
