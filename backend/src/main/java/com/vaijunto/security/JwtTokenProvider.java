@@ -27,11 +27,23 @@ public class JwtTokenProvider {
 
     public String generateToken(Authentication authentication, UUID userId) {
         UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+        return generateToken(userDetails.getUsername(), userId);
+    }
+
+    /**
+     * Gera o token direto a partir do e-mail, sem passar por
+     * {@link org.springframework.security.authentication.AuthenticationManager}.
+     *
+     * Usado logo após confirmar o código de verificação: a identidade já foi
+     * provada pela senha no cadastro, então não faz sentido pedir a senha de
+     * novo só para emitir o token — o e-mail confirmado já é a prova aqui.
+     */
+    public String generateToken(String email, UUID userId) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpirationInMs);
 
         return Jwts.builder()
-                .subject(userDetails.getUsername())
+                .subject(email)
                 .claim("userId", userId.toString())
                 .issuedAt(now)
                 .expiration(expiryDate)

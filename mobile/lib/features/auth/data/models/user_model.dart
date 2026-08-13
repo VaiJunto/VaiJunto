@@ -43,3 +43,19 @@ class AuthResponse {
     );
   }
 }
+
+/// Resposta do cadastro. Sem usuário/token de propósito — a conta só fica
+/// utilizável depois que o código de confirmação enviado a [email] é validado.
+class RegisterResult {
+  final String email;
+  final String message;
+
+  RegisterResult({required this.email, required this.message});
+
+  factory RegisterResult.fromJson(Map<String, dynamic> json) {
+    return RegisterResult(
+      email: json['email'] as String,
+      message: json['message'] as String? ?? '',
+    );
+  }
+}

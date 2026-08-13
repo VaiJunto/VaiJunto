@@ -31,7 +31,7 @@ CREATE TABLE users (
     email VARCHAR(255) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     phone VARCHAR(50),
-    profile_types VARCHAR(50)[] NOT NULL DEFAULT '{PASSENGER}',
+    profile_types VARCHAR(255) NOT NULL DEFAULT 'PASSENGER',
     university_id UUID REFERENCES universities(id),
     is_active BOOLEAN DEFAULT TRUE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,

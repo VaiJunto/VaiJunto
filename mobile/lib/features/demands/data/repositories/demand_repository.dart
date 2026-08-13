@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/models/location_model.dart';
 import '../../../../core/network/api_client.dart';
 import '../models/demand_model.dart';
 
@@ -28,5 +29,26 @@ class DemandRepository {
     } catch (e) {
       throw Exception('Erro ao buscar demandas próximas: $e');
     }
+  }
+
+  Future<DemandModel> createDemand({
+    required String originName,
+    required LocationModel originLocation,
+    required String destinationName,
+    required LocationModel destinationLocation,
+    required DateTime desiredTime,
+  }) async {
+    final response = await _dio.post(
+      '/demands',
+      data: {
+        'originName': originName,
+        'originLocation': originLocation.toJson(),
+        'destinationName': destinationName,
+        'destinationLocation': destinationLocation.toJson(),
+        'desiredTime': desiredTime.toIso8601String(),
+      },
+    );
+
+    return DemandModel.fromJson(response.data);
   }
 }

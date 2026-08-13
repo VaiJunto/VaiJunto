@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/models/location_model.dart';
 import '../../../../core/network/api_client.dart';
 import '../models/offer_model.dart';
 
@@ -28,5 +29,42 @@ class OfferRepository {
     } catch (e) {
       throw Exception('Erro ao buscar ofertas próximas: $e');
     }
+  }
+
+  /// Cria a rota e a oferta juntas — ainda não existe um fluxo separado de
+  /// cadastro de rotas no backend, então o motorista publica as duas de uma vez.
+  Future<OfferModel> createOffer({
+    required String routeName,
+    required String originName,
+    required LocationModel originLocation,
+    required String destinationName,
+    required LocationModel destinationLocation,
+    required int availableSeats,
+    required double price,
+    required DateTime departureAt,
+  }) async {
+    final response = await _dio.post(
+      '/offers',
+      data: {
+        'routeName': routeName,
+        'originName': originName,
+        'originLocation': originLocation.toJson(),
+        'destinationName': destinationName,
+        'destinationLocation': destinationLocation.toJson(),
+        'departureTime': _formatTimeOfDay(departureAt),
+        'isRecurrent': false,
+        'availableSeats': availableSeats,
+        'price': price,
+        'departureAt': departureAt.toIso8601String(),
+      },
+    );
+
+    return OfferModel.fromJson(response.data);
+  }
+
+  String _formatTimeOfDay(DateTime dateTime) {
+    final hour = dateTime.hour.toString().padLeft(2, '0');
+    final minute = dateTime.minute.toString().padLeft(2, '0');
+    return '$hour:$minute:00';
   }
 }

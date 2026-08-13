@@ -50,6 +50,15 @@ public class User {
     @Builder.Default
     private Boolean isActive = true;
 
+    /**
+     * Confirmou o código enviado por e-mail no cadastro. Distinto de
+     * {@link #isActive} de propósito: uma conta pode existir (isActive) sem
+     * ainda ter provado que o e-mail institucional é real.
+     */
+    @Column(name = "email_verified", nullable = false)
+    @Builder.Default
+    private Boolean emailVerified = false;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
