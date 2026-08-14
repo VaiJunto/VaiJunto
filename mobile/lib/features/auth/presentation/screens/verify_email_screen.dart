@@ -184,6 +184,21 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                 ),
                 const SizedBox(height: 18),
               ],
+              // Botão de reenvio sempre acima do campo de código — nunca
+              // embaixo do botão de confirmar (afterContent do AuthVisualShell
+              // renderiza depois do content inteiro, por isso fica aqui dentro).
+              NeoOutlineButton(
+                onPressed: canResend ? () => _resend() : null,
+                icon: const Icon(Icons.refresh_rounded),
+                child: _isResending
+                    ? const NeoLoadingIndicator(compact: true)
+                    : Text(
+                        _cooldownRemaining > 0
+                            ? 'REENVIAR EM ${_cooldownRemaining}s'
+                            : 'REENVIAR CÓDIGO',
+                      ),
+              ),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _codeController,
                 enabled: _hasFreshCode,
@@ -220,17 +235,6 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
             ],
           ),
         ),
-      ),
-      afterContent: NeoOutlineButton(
-        onPressed: canResend ? () => _resend() : null,
-        icon: const Icon(Icons.refresh_rounded),
-        child: _isResending
-            ? const NeoLoadingIndicator(compact: true)
-            : Text(
-                _cooldownRemaining > 0
-                    ? 'REENVIAR EM ${_cooldownRemaining}s'
-                    : 'REENVIAR CÓDIGO',
-              ),
       ),
     );
   }
