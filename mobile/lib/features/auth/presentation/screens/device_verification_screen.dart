@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_exception.dart';
-import '../../../../core/theme/neo_brutal_theme.dart';
 import '../../../../core/ui/app_snackbar.dart';
 import '../../../../core/ui/neo_button.dart';
 import '../../../../core/ui/neo_card.dart';
@@ -80,7 +79,10 @@ class _DeviceVerificationScreenState
 
       if (!mounted) return;
       ref.read(authStateProvider.notifier).setAuthenticated(user);
-      AppSnackbar.success(context, 'Device confirmado! Bem-vindo de volta.');
+      AppSnackbar.success(
+        context,
+        'Dispositivo confirmado! Bem-vindo de volta.',
+      );
       Navigator.of(context).popUntil((route) => route.isFirst);
     } on DioException catch (e) {
       if (!mounted) return;
@@ -118,11 +120,11 @@ class _DeviceVerificationScreenState
 
     return AuthVisualShell(
       code: 'VJ//DEVICE_HANDSHAKE',
-      title: 'Novo device',
+      title: 'Confirme o dispositivo',
       description:
-          'Primeiro acesso deste aparelho: confirme os seis dígitos enviados '
-          'para o seu e-mail institucional para liberar a sessão.',
-      stepLabel: 'CÓDIGO ATIVO',
+          'Este é o primeiro acesso neste dispositivo. Digite o código de seis '
+          'dígitos enviado para o seu e-mail institucional.',
+      stepLabel: 'CÓDIGO ENVIADO',
       showBack: true,
       content: NeoCard(
         color: scheme.surface,
@@ -145,7 +147,7 @@ class _DeviceVerificationScreenState
                   const SizedBox(width: 11),
                   Expanded(
                     child: Text(
-                      'ESTE DEVICE AINDA NÃO É CONHECIDO',
+                      'DISPOSITIVO AINDA NÃO VERIFICADO',
                       style: theme.textTheme.labelMedium,
                     ),
                   ),
@@ -196,7 +198,7 @@ class _DeviceVerificationScreenState
                 trailing: _isVerifying ? null : const Icon(Icons.check_rounded),
                 child: _isVerifying
                     ? const NeoLoadingIndicator(compact: true)
-                    : const Text('CONFIRMAR DEVICE'),
+                    : const Text('CONFIRMAR CÓDIGO'),
               ),
             ],
           ),

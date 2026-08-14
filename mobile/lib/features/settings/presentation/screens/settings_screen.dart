@@ -8,6 +8,8 @@ import '../../../../core/ui/neo_button.dart';
 import '../../../../core/ui/neo_card.dart';
 import '../../../auth/data/models/user_model.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../vehicles/presentation/screens/vehicles_screen.dart';
+import '../../../addresses/presentation/screens/addresses_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key, required this.user});
@@ -42,7 +44,7 @@ class SettingsScreen extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          user.name.toUpperCase(),
+                          (user.fullName ?? user.name).toUpperCase(),
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.titleMedium,
                         ),
@@ -53,6 +55,15 @@ class SettingsScreen extends ConsumerWidget {
                           style: theme.textTheme.bodySmall
                               ?.copyWith(color: scheme.onSurfaceVariant),
                         ),
+                        if ((user.course ?? '').isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            user.course!,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall
+                                ?.copyWith(color: scheme.onSurfaceVariant),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -70,21 +81,37 @@ class SettingsScreen extends ConsumerWidget {
               color: scheme.surface,
               padding: EdgeInsets.zero,
               offset: NeoBrutal.shadowOffsetSmall,
-              child: const Column(
+              child: Column(
                 children: [
                   _SettingRow(
+                    icon: Icons.directions_car_rounded,
+                    title: 'Meus veículos',
+                    subtitle: 'Cadastre e escolha o veículo padrão',
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => const VehiclesScreen())),
+                  ),
+                  const _HudDivider(),
+                  _SettingRow(
+                    icon: Icons.place_outlined,
+                    title: 'Endereços salvos',
+                    subtitle: 'Casa, trabalho e locais recentes',
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => const AddressesScreen())),
+                  ),
+                  const _HudDivider(),
+                  const _SettingRow(
                     icon: Icons.notifications_outlined,
                     title: 'Notificações',
                     subtitle: 'Viagens, pedidos e mensagens',
                   ),
-                  _HudDivider(),
-                  _SettingRow(
+                  const _HudDivider(),
+                  const _SettingRow(
                     icon: Icons.shield_outlined,
                     title: 'Privacidade',
                     subtitle: 'Conta e dados pessoais',
                   ),
-                  _HudDivider(),
-                  _SettingRow(
+                  const _HudDivider(),
+                  const _SettingRow(
                     icon: Icons.contrast_rounded,
                     title: 'Aparência',
                     subtitle: 'Tema do dispositivo',
@@ -110,47 +137,54 @@ class SettingsScreen extends ConsumerWidget {
 
 class _SettingRow extends StatelessWidget {
   const _SettingRow(
-      {required this.icon, required this.title, required this.subtitle});
+      {required this.icon,
+      required this.title,
+      required this.subtitle,
+      this.onTap});
 
   final IconData icon;
   final String title;
   final String subtitle;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            color: scheme.primary,
-            alignment: Alignment.center,
-            child: Icon(icon, size: 20, color: Colors.white),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title.toUpperCase(), style: theme.textTheme.labelMedium),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: scheme.onSurfaceVariant),
+    return InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                color: scheme.primary,
+                alignment: Alignment.center,
+                child: Icon(icon, size: 20, color: Colors.white),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title.toUpperCase(),
+                        style: theme.textTheme.labelMedium),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: scheme.onSurfaceVariant),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              NeoBadge(color: scheme.secondary, child: const Text('EM BREVE')),
+            ],
           ),
-          NeoBadge(color: scheme.secondary, child: const Text('EM BREVE')),
-        ],
-      ),
-    );
+        ));
   }
 }
 

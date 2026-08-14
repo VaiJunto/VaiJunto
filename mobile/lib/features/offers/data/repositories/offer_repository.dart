@@ -33,6 +33,13 @@ class OfferRepository {
     }
   }
 
+  Future<List<OfferModel>> getMyOffers() async {
+    final response = await _dio.get('/offers/mine');
+    return (response.data as List)
+        .map((json) => OfferModel.fromJson(json))
+        .toList();
+  }
+
   /// Cria a rota e a oferta juntas — ainda não existe um fluxo separado de
   /// cadastro de rotas no backend, então o motorista publica as duas de uma vez.
   Future<OfferModel> createOffer({
@@ -45,6 +52,7 @@ class OfferRepository {
     required double price,
     required DateTime departureAt,
     required bool isFixed,
+    required String vehicleId,
   }) async {
     final response = await _dio.post(
       '/offers',
@@ -56,6 +64,7 @@ class OfferRepository {
         'destinationLocation': destinationLocation.toJson(),
         'departureTime': _formatTimeOfDay(departureAt),
         'isRecurrent': isFixed,
+        'vehicleId': vehicleId,
         'availableSeats': availableSeats,
         'price': price,
         'departureAt': formatApiDateTime(departureAt),

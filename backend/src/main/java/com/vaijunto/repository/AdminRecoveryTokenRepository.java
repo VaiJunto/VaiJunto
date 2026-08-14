@@ -1,0 +1,1 @@
+package com.vaijunto.repository; import com.vaijunto.domain.entities.AdminRecoveryToken; import org.springframework.data.jpa.repository.JpaRepository; import java.util.*; public interface AdminRecoveryTokenRepository extends JpaRepository<AdminRecoveryToken,UUID>{Optional<AdminRecoveryToken> findByTokenHash(String hash);}

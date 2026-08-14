@@ -12,16 +12,21 @@ import '../../../../core/ui/neo_button.dart';
 import '../../../../core/ui/neo_flow_header.dart';
 import '../../../../core/ui/neo_loading_indicator.dart';
 import '../providers/offer_provider.dart';
+import '../../data/models/offer_model.dart';
+import '../../../vehicles/presentation/providers/vehicle_provider.dart';
+import '../../../vehicles/data/models/vehicle_model.dart';
 
 class CreateOfferScreen extends ConsumerStatefulWidget {
   const CreateOfferScreen({
     super.key,
     this.embedded = false,
     this.onCreated,
+    this.initialOffer,
   });
 
   final bool embedded;
   final VoidCallback? onCreated;
+  final OfferModel? initialOffer;
 
   @override
   ConsumerState<CreateOfferScreen> createState() => _CreateOfferScreenState();
@@ -38,6 +43,30 @@ class _CreateOfferScreenState extends ConsumerState<CreateOfferScreen> {
   GeocodingResult? _otherAddress;
   DateTime _departureAt = DateTime.now().add(const Duration(hours: 1));
   bool _isFixed = false;
+  VehicleModel? _vehicle;
+
+  @override
+  void initState() {
+    super.initState();
+    final offer = widget.initialOffer;
+    if (offer == null ||
+        offer.originLocation == null ||
+        offer.destinationLocation == null) return;
+    final toFatec = offer.destinationName.toUpperCase().contains('FATEC');
+    _direction = toFatec ? TripDirection.toFatec : TripDirection.fromFatec;
+    final point = toFatec ? offer.originLocation! : offer.destinationLocation!;
+    final name = toFatec ? offer.originName : offer.destinationName;
+    _otherAddress = GeocodingResult(
+        displayName: name,
+        primaryText: name,
+        secondaryText: '',
+        latitude: point.latitude,
+        longitude: point.longitude,
+        distanceKm: null);
+    _departureAt = offer.departureAt.add(const Duration(days: 1));
+    _seatsController.text = offer.availableSeats.toString();
+    _priceController.text = offer.price.toStringAsFixed(2);
+  }
 
   @override
   void dispose() {
@@ -88,6 +117,10 @@ class _CreateOfferScreenState extends ConsumerState<CreateOfferScreen> {
   void _submit() {
     FocusScope.of(context).unfocus();
     if (!_detailsFormKey.currentState!.validate()) return;
+    if (_vehicle == null) {
+      AppSnackbar.error(context, 'Selecione um veículo para publicar.');
+      return;
+    }
 
     final other = _otherAddress!;
     final otherLocation = LocationModel(
@@ -110,12 +143,15 @@ class _CreateOfferScreenState extends ConsumerState<CreateOfferScreen> {
               double.parse(_priceController.text.trim().replaceAll(',', '.')),
           departureAt: _departureAt,
           isFixed: _isFixed,
+          vehicleId: _vehicle!.id,
         );
   }
 
   String? _seatsValidator(String? value) {
     final seats = int.tryParse(value?.trim() ?? '');
     if (seats == null || seats < 1) return 'Mínimo: 1';
+    if (_vehicle != null && seats > _vehicle!.capacity)
+      return 'Máximo: ${_vehicle!.capacity} vagas';
     return null;
   }
 
@@ -128,6 +164,17 @@ class _CreateOfferScreenState extends ConsumerState<CreateOfferScreen> {
   @override
   Widget build(BuildContext context) {
     final createState = ref.watch(createOfferProvider);
+    final vehicles = ref.watch(vehiclesProvider);
+    vehicles.whenData((list) {
+      if (_vehicle == null && list.isNotEmpty)
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted)
+            setState(() => _vehicle = list.firstWhere(
+                (v) => v.id == widget.initialOffer?.vehicleId,
+                orElse: () => list.firstWhere((v) => v.isDefault,
+                    orElse: () => list.first)));
+        });
+    });
 
     ref.listen(createOfferProvider, (previous, next) {
       next.whenOrNull(
@@ -169,6 +216,14 @@ class _CreateOfferScreenState extends ConsumerState<CreateOfferScreen> {
               onPickDate: _pickDepartureAt,
               onSubmit: createState.isLoading ? null : _submit,
               isLoading: createState.isLoading,
+              vehicle: _vehicle,
+              vehicles: vehicles.valueOrNull ?? const [],
+              onVehicleChanged: (value) => setState(() {
+                _vehicle = value;
+                if (int.tryParse(_seatsController.text) != null &&
+                    int.parse(_seatsController.text) > value.capacity)
+                  _seatsController.text = value.capacity.toString();
+              }),
             ),
     );
 
@@ -270,6 +325,9 @@ class _OfferDetailsStep extends StatelessWidget {
     required this.onPickDate,
     required this.onSubmit,
     required this.isLoading,
+    required this.vehicle,
+    required this.vehicles,
+    required this.onVehicleChanged,
   });
 
   final GlobalKey<FormState> formKey;
@@ -286,6 +344,9 @@ class _OfferDetailsStep extends StatelessWidget {
   final VoidCallback onPickDate;
   final VoidCallback? onSubmit;
   final bool isLoading;
+  final VehicleModel? vehicle;
+  final List<VehicleModel> vehicles;
+  final ValueChanged<VehicleModel> onVehicleChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -305,6 +366,23 @@ class _OfferDetailsStep extends StatelessWidget {
             const SizedBox(height: 16),
             NeoRouteReview(
                 origin: origin, destination: destination, onEdit: onEditRoute),
+            const SizedBox(height: 14),
+            DropdownButtonFormField<VehicleModel>(
+              value: vehicle,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'Veículo'),
+              hint: const Text('Cadastre um veículo para continuar'),
+              items: vehicles
+                  .map((v) => DropdownMenuItem(
+                      value: v,
+                      child: Text(
+                          '${v.model.isEmpty ? 'Veículo' : v.model} • ${v.capacity} vagas')))
+                  .toList(),
+              onChanged: (value) {
+                if (value != null) onVehicleChanged(value);
+              },
+              validator: (_) => vehicle == null ? 'Selecione um veículo' : null,
+            ),
             const SizedBox(height: 14),
             _FixedOfferToggle(value: isFixed, onChanged: onFixedChanged),
             const SizedBox(height: 12),

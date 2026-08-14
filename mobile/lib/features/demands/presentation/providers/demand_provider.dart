@@ -12,6 +12,8 @@ final nearbyDemandsProvider =
   return repository.getNearbyDemands(location.latitude, location.longitude,
       distance: 50000);
 });
+final myDemandsProvider = FutureProvider<List<DemandModel>>(
+    (ref) => ref.watch(demandRepositoryProvider).getMyDemands());
 
 final createDemandProvider = StateNotifierProvider.autoDispose<
     CreateDemandNotifier, AsyncValue<DemandModel?>>((ref) {

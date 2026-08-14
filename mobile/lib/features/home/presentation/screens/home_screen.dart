@@ -13,6 +13,10 @@ import '../../../demands/presentation/providers/demand_provider.dart';
 import '../../../offers/presentation/providers/offer_provider.dart';
 import '../../../rides/presentation/screens/rides_screen.dart';
 import '../../../settings/presentation/screens/settings_screen.dart';
+import '../../../my_rides/presentation/screens/my_rides_screen.dart';
+import '../../../offers/presentation/screens/create_offer_screen.dart';
+import '../../../offers/data/models/offer_model.dart';
+import '../../../demands/presentation/screens/create_demand_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key, required this.user});
@@ -24,24 +28,21 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
-  static const _destinations = [
-    NeoBottomNavDestination(icon: Icons.route_rounded, label: 'Caronas'),
-    NeoBottomNavDestination(icon: Icons.add_box_outlined, label: 'Criar'),
-    NeoBottomNavDestination(icon: Icons.forum_outlined, label: 'Chat'),
-    NeoBottomNavDestination(icon: Icons.tune_rounded, label: 'Ajustes'),
+  static const _titles = ['CARONAS', 'MINHAS CARONAS', 'CHAT', 'AJUSTES'];
+  static const _codes = [
+    'VJ//RIDES',
+    'VJ//MY_RIDES',
+    'VJ//COMMS',
+    'VJ//SYSTEM'
   ];
 
-  static const _titles = ['CARONAS', 'CRIAR', 'CHAT', 'AJUSTES'];
-  static const _codes = ['VJ//RIDES', 'VJ//CREATE', 'VJ//COMMS', 'VJ//SYSTEM'];
-
   int _currentIndex = 0;
-  CreateRideMode _createMode = CreateRideMode.offer;
 
-  void _openCreate(CreateRideMode mode) {
-    setState(() {
-      _createMode = mode;
-      _currentIndex = 1;
-    });
+  void _openCreate(CreateRideMode mode, {OfferModel? offer}) {
+    Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => mode == CreateRideMode.offer
+            ? CreateOfferScreen(onCreated: _handleCreated, initialOffer: offer)
+            : CreateDemandScreen(onCreated: _handleCreated)));
   }
 
   void _handleCreated() {
@@ -54,16 +55,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final upcomingCount = ref
+            .watch(myOffersProvider)
+            .valueOrNull
+            ?.where((offer) => offer.departureAt.isAfter(DateTime.now()))
+            .length ??
+        0;
+    final destinations = [
+      const NeoBottomNavDestination(
+          icon: Icons.route_rounded, label: 'Caronas'),
+      NeoBottomNavDestination(
+          icon: Icons.event_note_rounded,
+          label: 'Minhas',
+          badgeCount: upcomingCount),
+      const NeoBottomNavDestination(icon: Icons.forum_outlined, label: 'Chat'),
+      const NeoBottomNavDestination(icon: Icons.tune_rounded, label: 'Ajustes'),
+    ];
     final pages = [
       RidesScreen(
         onCreateOffer: () => _openCreate(CreateRideMode.offer),
         onCreateDemand: () => _openCreate(CreateRideMode.demand),
       ),
-      CreateHubScreen(
-        mode: _createMode,
-        onModeChanged: (mode) => setState(() => _createMode = mode),
-        onCreated: _handleCreated,
-      ),
+      MyRidesScreen(
+          onOfferAgain: (offer) =>
+              _openCreate(CreateRideMode.offer, offer: offer)),
       const ChatScreen(),
       SettingsScreen(user: widget.user),
     ];
@@ -142,8 +157,46 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
       bottomNavigationBar: NeoBottomNavBar(
         currentIndex: _currentIndex,
-        destinations: _destinations,
+        destinations: destinations,
         onSelected: (index) => setState(() => _currentIndex = index),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showCreateMenu(context),
+        backgroundColor: scheme.primary,
+        foregroundColor: Colors.white,
+        child: const Icon(Icons.add_rounded),
+      ),
+    );
+  }
+
+  void _showCreateMenu(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (sheet) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.directions_car_rounded),
+                title: const Text('OFERECER CARONA'),
+                onTap: () {
+                  Navigator.pop(sheet);
+                  _openCreate(CreateRideMode.offer);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.hail_rounded),
+                title: const Text('PEDIR CARONA'),
+                onTap: () {
+                  Navigator.pop(sheet);
+                  _openCreate(CreateRideMode.demand);
+                },
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

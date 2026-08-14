@@ -1,0 +1,3 @@
+package com.vaijunto.dto;
+import com.vaijunto.domain.entities.Vehicle; import java.util.UUID;
+public record VehicleDto(UUID id,String licensePlate,String model,String make,String trim,Integer year,String color,Integer capacity,String fuel,Double averageConsumption,String photoUrl,boolean isDefault,String vehicleType) { public static VehicleDto from(Vehicle v) { return new VehicleDto(v.getId(),v.getLicensePlate(),v.getModel(),v.getMake(),v.getTrim(),v.getYear(),v.getColor(),v.getCapacity(),v.getFuel(),v.getAverageConsumption(),v.getPhotoUrl(),Boolean.TRUE.equals(v.getIsDefault()),v.getVehicleType().name()); } }

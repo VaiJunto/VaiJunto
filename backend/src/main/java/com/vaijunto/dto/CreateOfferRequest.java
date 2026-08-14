@@ -29,4 +29,6 @@ public class CreateOfferRequest {
     private Integer availableSeats;
     private BigDecimal price;
     private OffsetDateTime departureAt;
+    /** Optional road distance supplied by the route client; straight-line distance is the safe fallback. */
+    private Double distanceKm;
 }

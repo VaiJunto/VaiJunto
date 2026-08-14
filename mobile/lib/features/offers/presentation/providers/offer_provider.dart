@@ -13,6 +13,9 @@ final nearbyOffersProvider =
       distance: 50000);
 });
 
+final myOffersProvider = FutureProvider<List<OfferModel>>(
+    (ref) => ref.watch(offerRepositoryProvider).getMyOffers());
+
 final createOfferProvider = StateNotifierProvider.autoDispose<
     CreateOfferNotifier, AsyncValue<OfferModel?>>((ref) {
   return CreateOfferNotifier(ref.watch(offerRepositoryProvider));
@@ -33,6 +36,7 @@ class CreateOfferNotifier extends StateNotifier<AsyncValue<OfferModel?>> {
     required double price,
     required DateTime departureAt,
     required bool isFixed,
+    required String vehicleId,
   }) async {
     state = const AsyncValue.loading();
     try {
@@ -46,6 +50,7 @@ class CreateOfferNotifier extends StateNotifier<AsyncValue<OfferModel?>> {
         price: price,
         departureAt: departureAt,
         isFixed: isFixed,
+        vehicleId: vehicleId,
       );
       state = AsyncValue.data(offer);
     } on DioException catch (e, st) {

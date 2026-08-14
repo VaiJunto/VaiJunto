@@ -12,4 +12,5 @@ import java.util.UUID;
 public interface TripPassengerRepository extends JpaRepository<TripPassenger, UUID> {
     List<TripPassenger> findByTripInstanceId(UUID tripInstanceId);
     Optional<TripPassenger> findByTripInstanceIdAndPassengerId(UUID tripInstanceId, UUID passengerId);
+    long countByPassengerIdAndStatusIn(UUID passengerId, java.util.Collection<com.vaijunto.domain.enums.PassengerStatus> statuses);
 }

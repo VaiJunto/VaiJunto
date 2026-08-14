@@ -7,4 +7,4 @@
 ///
 /// Formato `major.minor.patch.build`, espelhado no `version:` do pubspec.yaml
 /// como `major.minor.patch+build`. Os dois precisam andar juntos.
-const String kAppVersion = '1.8.0.24';
+const String kAppVersion = '1.11.0.0';

@@ -28,6 +28,31 @@ public class User {
     @Column(nullable = false)
     private String name;
 
+    @Column(name = "full_name", nullable = false)
+    private String fullName;
+
+    @Column
+    private String course;
+
+    @Column(name = "photo_url")
+    private String photoUrl;
+
+    @Column(name = "verification_badge_active", nullable = false)
+    @Builder.Default
+    private Boolean verificationBadgeActive = false;
+
+    @Column(name = "deletion_requested_at")
+    private OffsetDateTime deletionRequestedAt;
+
+    @Column(name = "anonymized_at")
+    private OffsetDateTime anonymizedAt;
+
+    @Column(name = "requested_full_name")
+    private String requestedFullName;
+
+    @Column(name = "name_change_status")
+    private String nameChangeStatus;
+
     @Column(nullable = false, unique = true)
     private String email;
 

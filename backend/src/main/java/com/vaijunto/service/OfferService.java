@@ -51,11 +51,25 @@ public class OfferService {
         User driver = userRepository.findByEmail(driverEmail)
                 .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado"));
 
+        if (request.getAvailableSeats() == null || request.getAvailableSeats() < 1) throw new IllegalArgumentException("Informe ao menos uma vaga.");
+        if (request.getDepartureAt() == null || request.getDepartureAt().isBefore(OffsetDateTime.now())) throw new IllegalArgumentException("Informe um horário futuro.");
+        if (!hasFatecEndpoint(request.getOriginName(), request.getDestinationName())) throw new IllegalArgumentException("A Fatec deve ser origem ou destino da carona.");
         Vehicle vehicle = null;
         if (request.getVehicleId() != null) {
             vehicle = vehicleRepository.findById(request.getVehicleId())
                     .orElseThrow(() -> new IllegalArgumentException("Veículo não encontrado"));
+            if (!vehicle.getDriver().getId().equals(driver.getId()) || vehicle.getArchivedAt() != null) {
+                throw new IllegalArgumentException("Veículo não encontrado");
+            }
+        } else {
+            vehicle = vehicleRepository.findByDriverIdAndArchivedAtIsNullOrderByIsDefaultDescCreatedAtDesc(driver.getId())
+                    .stream().findFirst().orElseThrow(() -> new IllegalArgumentException("Cadastre um veículo antes de oferecer uma carona."));
         }
+        if (request.getAvailableSeats() > vehicle.getCapacity()) throw new IllegalArgumentException("As vagas não podem exceder a capacidade do veículo.");
+        if (offerRepository.existsOverlappingOffer(driver.getId(), request.getDepartureAt().minusMinutes(90), request.getDepartureAt().plusMinutes(90))) throw new IllegalArgumentException("Você já possui uma oferta em horário sobreposto.");
+        BigDecimal requestedPrice = request.getPrice() == null ? BigDecimal.ZERO : request.getPrice();
+        BigDecimal assistanceLimit = assistanceLimit(request, vehicle);
+        if (requestedPrice.compareTo(assistanceLimit) > 0) requestedPrice = assistanceLimit;
 
         Route route = Route.builder()
                 .driver(driver)
@@ -75,7 +89,7 @@ public class OfferService {
                 .route(route)
                 .driver(driver)
                 .availableSeats(request.getAvailableSeats())
-                .price(request.getPrice() != null ? request.getPrice() : BigDecimal.ZERO)
+                .price(requestedPrice)
                 .departureAt(request.getDepartureAt())
                 .build();
 
@@ -83,18 +97,53 @@ public class OfferService {
     }
 
     private Point toPoint(LocationDto location) {
+        if (location == null) throw new IllegalArgumentException("Informe os dois pontos da rota.");
         return geometryFactory.createPoint(new Coordinate(location.getLongitude(), location.getLatitude()));
     }
 
-    private OfferDto mapToDto(Offer offer) {
+    @Transactional(readOnly = true)
+    public List<OfferDto> findMine(String email) {
+        User user = userRepository.findByEmail(email).orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado"));
+        return offerRepository.findByDriverIdOrderByDepartureAtAsc(user.getId()).stream().map(o -> mapToDto(o, true)).collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public com.vaijunto.dto.PageResponse<OfferDto> browse(int page, int size) {
+        int safeSize = Math.min(Math.max(size, 1), 50);
+        var result = offerRepository.findByStatusInAndDepartureAtAfterOrderByDepartureAtAsc(List.of(com.vaijunto.domain.enums.OfferStatus.ACTIVE, com.vaijunto.domain.enums.OfferStatus.FULL), OffsetDateTime.now(), org.springframework.data.domain.PageRequest.of(Math.max(page, 0), safeSize));
+        return com.vaijunto.dto.PageResponse.from(result.map(this::mapToDto));
+    }
+
+    private boolean hasFatecEndpoint(String origin, String destination) {
+        return (origin != null && origin.toUpperCase().contains("FATEC")) || (destination != null && destination.toUpperCase().contains("FATEC"));
+    }
+
+    private BigDecimal assistanceLimit(CreateOfferRequest request, Vehicle vehicle) {
+        double km = request.getDistanceKm() != null && request.getDistanceKm() > 0 ? request.getDistanceKm() : straightLineKm(request.getOriginLocation(), request.getDestinationLocation()) * 1.25;
+        double consumption = vehicle.getAverageConsumption() != null && vehicle.getAverageConsumption() > 0 ? vehicle.getAverageConsumption() : 10d;
+        double total = (km * 1.10 / consumption) * 6.0;
+        return BigDecimal.valueOf(total / (request.getAvailableSeats() + 1d)).setScale(2, java.math.RoundingMode.DOWN);
+    }
+
+    private double straightLineKm(LocationDto a, LocationDto b) {
+        double dLat = Math.toRadians(b.getLatitude() - a.getLatitude()), dLon = Math.toRadians(b.getLongitude() - a.getLongitude());
+        double h = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(Math.toRadians(a.getLatitude())) * Math.cos(Math.toRadians(b.getLatitude())) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        return 6371d * 2d * Math.atan2(Math.sqrt(h), Math.sqrt(1d - h));
+    }
+
+    private OfferDto mapToDto(Offer offer) { return mapToDto(offer, false); }
+    private OfferDto mapToDto(Offer offer, boolean owner) {
         return OfferDto.builder()
                 .id(offer.getId())
                 .routeId(offer.getRoute() != null ? offer.getRoute().getId() : null)
+                .vehicleId(offer.getRoute() != null && offer.getRoute().getVehicle() != null ? offer.getRoute().getVehicle().getId() : null)
                 .driverId(offer.getDriver().getId())
                 .driverName(offer.getDriver().getName())
                 .routeName(offer.getRoute() != null ? offer.getRoute().getName() : null)
-                .originName(offer.getRoute() != null ? offer.getRoute().getOriginName() : null)
-                .destinationName(offer.getRoute() != null ? offer.getRoute().getDestinationName() : null)
+                .originName(owner && offer.getRoute() != null ? offer.getRoute().getOriginName() : publicRegion(offer.getRoute() != null ? offer.getRoute().getOriginName() : null))
+                .destinationName(owner && offer.getRoute() != null ? offer.getRoute().getDestinationName() : publicRegion(offer.getRoute() != null ? offer.getRoute().getDestinationName() : null))
+                .originLocation(owner && offer.getRoute() != null ? new LocationDto(offer.getRoute().getOriginLocation().getY(), offer.getRoute().getOriginLocation().getX()) : null)
+                .destinationLocation(owner && offer.getRoute() != null ? new LocationDto(offer.getRoute().getDestinationLocation().getY(), offer.getRoute().getDestinationLocation().getX()) : null)
                 .availableSeats(offer.getAvailableSeats())
                 .price(offer.getPrice())
                 .departureAt(offer.getDepartureAt())
@@ -102,4 +151,5 @@ public class OfferService {
                 .status(offer.getStatus())
                 .build();
     }
+    private String publicRegion(String value) { return value != null && value.toUpperCase().contains("FATEC") ? "FATEC" : "Região aproximada"; }
 }

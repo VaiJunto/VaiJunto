@@ -12,10 +12,11 @@ class GeocodingRepository {
 
   GeocodingRepository(this._dio);
 
-  Future<List<GeocodingResult>> search(String query) async {
+  Future<List<GeocodingResult>> search(String query,
+      {bool outsideRegion = false}) async {
     final response = await _dio.get(
       '/geocoding/search',
-      queryParameters: {'q': query},
+      queryParameters: {'q': query, 'outsideRegion': outsideRegion},
     );
 
     final data = response.data as List;

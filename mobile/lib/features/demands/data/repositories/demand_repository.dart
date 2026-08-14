@@ -33,6 +33,13 @@ class DemandRepository {
     }
   }
 
+  Future<List<DemandModel>> getMyDemands() async {
+    final response = await _dio.get('/demands/mine');
+    return (response.data as List)
+        .map((json) => DemandModel.fromJson(json))
+        .toList();
+  }
+
   Future<DemandModel> createDemand({
     required String originName,
     required LocationModel originLocation,

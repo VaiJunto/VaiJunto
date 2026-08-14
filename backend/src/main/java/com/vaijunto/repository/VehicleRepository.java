@@ -10,4 +10,6 @@ import java.util.UUID;
 @Repository
 public interface VehicleRepository extends JpaRepository<Vehicle, UUID> {
     List<Vehicle> findByDriverId(UUID driverId);
+    List<Vehicle> findByDriverIdAndArchivedAtIsNullOrderByIsDefaultDescCreatedAtDesc(UUID driverId);
+    boolean existsByLicensePlateAndArchivedAtIsNull(String licensePlate);
 }

@@ -9,10 +9,16 @@ import org.springframework.stereotype.Repository;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 @Repository
 public interface OfferRepository extends JpaRepository<Offer, UUID> {
-    List<Offer> findByDriverId(UUID driverId);
+    List<Offer> findByDriverIdOrderByDepartureAtAsc(UUID driverId);
+    long countByDriverIdAndStatusIn(UUID driverId, java.util.Collection<com.vaijunto.domain.enums.OfferStatus> statuses);
+    @Query(value = "SELECT EXISTS(SELECT 1 FROM offers WHERE driver_id = :driverId AND status IN ('ACTIVE','FULL') AND departure_at BETWEEN :from AND :to)", nativeQuery = true)
+    boolean existsOverlappingOffer(@Param("driverId") UUID driverId, @Param("from") OffsetDateTime from, @Param("to") OffsetDateTime to);
+    Page<Offer> findByStatusInAndDepartureAtAfterOrderByDepartureAtAsc(java.util.Collection<com.vaijunto.domain.enums.OfferStatus> statuses, OffsetDateTime from, Pageable pageable);
 
     @Query(value = "SELECT o.* FROM offers o " +
             "JOIN routes r ON o.route_id = r.id " +

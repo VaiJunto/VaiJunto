@@ -81,6 +81,7 @@ public class AuthService {
 
         User user = User.builder()
                 .name(request.getName())
+                .fullName(request.getName().trim())
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .phone(request.getPhone())
@@ -312,7 +313,7 @@ public class AuthService {
                 .build();
 
         verificationCodeRepository.save(verification);
-        emailService.sendVerificationCode(user.getEmail(), user.getName(), code);
+        emailService.sendVerificationCode(user.getEmail(), user.getName(), code, purpose);
     }
 
     /**

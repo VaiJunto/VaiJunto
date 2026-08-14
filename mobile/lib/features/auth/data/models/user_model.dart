@@ -2,7 +2,11 @@ class UserModel {
   final String id;
   final String name;
   final String email;
+  final String? fullName;
   final String? phone;
+  final String? course;
+  final String? photoUrl;
+  final bool verificationBadgeActive;
   final List<String> profileTypes;
   final String? universityId;
   final String? universityName;
@@ -11,7 +15,11 @@ class UserModel {
     required this.id,
     required this.name,
     required this.email,
+    this.fullName,
     this.phone,
+    this.course,
+    this.photoUrl,
+    this.verificationBadgeActive = false,
     required this.profileTypes,
     this.universityId,
     this.universityName,
@@ -22,7 +30,11 @@ class UserModel {
       id: json['id'],
       name: json['name'],
       email: json['email'],
+      fullName: json['fullName'] as String?,
       phone: json['phone'],
+      course: json['course'] as String?,
+      photoUrl: json['photoUrl'] as String?,
+      verificationBadgeActive: json['verificationBadgeActive'] == true,
       profileTypes: List<String>.from(json['profileTypes'] ?? []),
       universityId: json['universityId'],
       universityName: json['universityName'],

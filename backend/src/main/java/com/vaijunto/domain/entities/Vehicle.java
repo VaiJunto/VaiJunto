@@ -32,8 +32,18 @@ public class Vehicle {
     @Column
     private String model;
 
+    @Column(name = "make") private String make;
+    @Column(name = "trim") private String trim;
+    @Column(name = "year") private Integer year;
+
     @Column
     private String color;
+
+    @Column private String fuel;
+    @Column(name = "average_consumption") private Double averageConsumption;
+    @Column(name = "photo_url") private String photoUrl;
+    @Column(name = "is_default", nullable = false) @Builder.Default private Boolean isDefault = false;
+    @Column(name = "archived_at") private OffsetDateTime archivedAt;
 
     @Column(nullable = false)
     private Integer capacity;

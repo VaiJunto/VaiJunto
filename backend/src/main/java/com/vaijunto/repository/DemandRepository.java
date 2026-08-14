@@ -9,10 +9,14 @@ import org.springframework.stereotype.Repository;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 @Repository
 public interface DemandRepository extends JpaRepository<Demand, UUID> {
-    List<Demand> findByPassengerId(UUID passengerId);
+    List<Demand> findByPassengerIdOrderByDesiredTimeAsc(UUID passengerId);
+    long countByPassengerIdAndStatusIn(UUID passengerId, java.util.Collection<com.vaijunto.domain.enums.DemandStatus> statuses);
+    Page<Demand> findByStatusAndDesiredTimeAfterOrderByDesiredTimeAsc(com.vaijunto.domain.enums.DemandStatus status, OffsetDateTime from, Pageable pageable);
 
     @Query(value = "SELECT d.* FROM demands d " +
             "WHERE d.status = 'OPEN' " +

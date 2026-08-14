@@ -44,6 +44,8 @@ public class DemandService {
         User passenger = userRepository.findByEmail(passengerEmail)
                 .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado"));
 
+        if (request.getDesiredTime() == null || request.getDesiredTime().isBefore(OffsetDateTime.now())) throw new IllegalArgumentException("Informe uma data e horário futuros.");
+        if (!hasFatecEndpoint(request.getOriginName(), request.getDestinationName())) throw new IllegalArgumentException("A Fatec deve ser origem ou destino do pedido.");
         Demand demand = Demand.builder()
                 .passenger(passenger)
                 .originName(request.getOriginName())
@@ -55,6 +57,30 @@ public class DemandService {
 
         return mapToDto(demandRepository.save(demand));
     }
+    @Transactional(readOnly = true)
+    public List<DemandDto> findMine(String email) {
+        User user = userRepository.findByEmail(email).orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado"));
+        return demandRepository.findByPassengerIdOrderByDesiredTimeAsc(user.getId()).stream().map(this::mapToDto).collect(Collectors.toList());
+    }
+    @Transactional(readOnly = true)
+    public com.vaijunto.dto.PageResponse<DemandDto> browse(int page, int size) {
+        int safeSize = Math.min(Math.max(size, 1), 50);
+        var result = demandRepository.findByStatusAndDesiredTimeAfterOrderByDesiredTimeAsc(com.vaijunto.domain.enums.DemandStatus.OPEN, OffsetDateTime.now(), org.springframework.data.domain.PageRequest.of(Math.max(page, 0), safeSize));
+        return com.vaijunto.dto.PageResponse.from(result.map(this::mapToDto));
+    }
+
+    @Transactional
+    public DemandDto updateDemand(java.util.UUID id, CreateDemandRequest request, String email) {
+        Demand demand = owned(id, email);
+        if (demand.getStatus() != com.vaijunto.domain.enums.DemandStatus.OPEN) throw new IllegalArgumentException("Este pedido não pode mais ser alterado.");
+        if (request.getDesiredTime() == null || request.getDesiredTime().isBefore(OffsetDateTime.now())) throw new IllegalArgumentException("Informe uma data e horário futuros.");
+        if (!hasFatecEndpoint(request.getOriginName(), request.getDestinationName())) throw new IllegalArgumentException("A Fatec deve ser origem ou destino do pedido.");
+        demand.setOriginName(request.getOriginName()); demand.setOriginLocation(toPoint(request.getOriginLocation())); demand.setDestinationName(request.getDestinationName()); demand.setDestinationLocation(toPoint(request.getDestinationLocation())); demand.setDesiredTime(request.getDesiredTime());
+        return mapToDto(demand);
+    }
+    @Transactional public void cancelDemand(java.util.UUID id, String email) { Demand d = owned(id, email); if (d.getStatus() != com.vaijunto.domain.enums.DemandStatus.OPEN) throw new IllegalArgumentException("Use o fluxo de cancelamento da carona aceita."); d.setStatus(com.vaijunto.domain.enums.DemandStatus.CANCELLED); }
+    private Demand owned(java.util.UUID id, String email) { Demand d = demandRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Pedido não encontrado")); if (!d.getPassenger().getEmail().equals(email)) throw new org.springframework.security.access.AccessDeniedException("Sem permissão para alterar este pedido."); return d; }
+    private boolean hasFatecEndpoint(String origin, String destination) { return (origin != null && origin.toUpperCase().contains("FATEC")) || (destination != null && destination.toUpperCase().contains("FATEC")); }
 
     private Point toPoint(LocationDto location) {
         return geometryFactory.createPoint(new Coordinate(location.getLongitude(), location.getLatitude()));
@@ -65,12 +91,13 @@ public class DemandService {
                 .id(demand.getId())
                 .passengerId(demand.getPassenger().getId())
                 .passengerName(demand.getPassenger().getName())
-                .originName(demand.getOriginName())
-                .originLocation(new LocationDto(demand.getOriginLocation().getY(), demand.getOriginLocation().getX()))
-                .destinationName(demand.getDestinationName())
-                .destinationLocation(new LocationDto(demand.getDestinationLocation().getY(), demand.getDestinationLocation().getX()))
+                .originName(publicRegion(demand.getOriginName()))
+                .originLocation(null)
+                .destinationName(publicRegion(demand.getDestinationName()))
+                .destinationLocation(null)
                 .desiredTime(demand.getDesiredTime())
                 .status(demand.getStatus())
                 .build();
     }
+    private String publicRegion(String value) { return value != null && value.toUpperCase().contains("FATEC") ? "FATEC" : "Região aproximada"; }
 }

@@ -16,10 +16,12 @@ public class GeocodingController {
     private final GeocodingService geocodingService;
 
     @GetMapping("/search")
-    public ResponseEntity<List<GeocodingResultDto>> search(@RequestParam String q) {
+    public ResponseEntity<List<GeocodingResultDto>> search(
+            @RequestParam String q,
+            @RequestParam(defaultValue = "false") boolean outsideRegion) {
         if (q.trim().length() < 3) {
             return ResponseEntity.ok(List.of());
         }
-        return ResponseEntity.ok(geocodingService.search(q.trim()));
+        return ResponseEntity.ok(geocodingService.search(q.trim(), outsideRegion));
     }
 }
