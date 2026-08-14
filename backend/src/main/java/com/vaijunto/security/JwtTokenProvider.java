@@ -15,14 +15,20 @@ import java.util.UUID;
 @Component
 public class JwtTokenProvider {
 
+    private static final String CHALLENGE_TYPE_CLAIM = "typ";
+    private static final String DEVICE_CHALLENGE_TYPE = "device_challenge";
+
     private final SecretKey key;
     private final long jwtExpirationInMs;
+    private final long deviceChallengeExpirationInMs;
 
     public JwtTokenProvider(
             @Value("${jwt.secret:404E635266556A586E3272357538782F413F4428472B4B6250655368566D5971}") String secret,
-            @Value("${jwt.expiration-ms:86400000}") long jwtExpirationInMs) {
+            @Value("${jwt.expiration-ms:86400000}") long jwtExpirationInMs,
+            @Value("${jwt.device-challenge-expiration-ms:600000}") long deviceChallengeExpirationInMs) {
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.jwtExpirationInMs = jwtExpirationInMs;
+        this.deviceChallengeExpirationInMs = deviceChallengeExpirationInMs;
     }
 
     public String generateToken(Authentication authentication, UUID userId) {
@@ -68,5 +74,44 @@ public class JwtTokenProvider {
         } catch (JwtException | IllegalArgumentException ex) {
             return false;
         }
+    }
+
+    /**
+     * Token de curta duração (10 min por padrão) que só serve pra trocar por
+     * um JWT de sessão em {@code POST /auth/verify-device}, depois de provar
+     * posse do e-mail. Nunca autentica nada sozinho — {@link com.vaijunto.security.JwtAuthenticationFilter}
+     * não aceita este tipo de token (não tem {@code userId} no formato que ele espera).
+     */
+    public String generateDeviceChallengeToken(UUID userId, String deviceId) {
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + deviceChallengeExpirationInMs);
+
+        return Jwts.builder()
+                .claim(CHALLENGE_TYPE_CLAIM, DEVICE_CHALLENGE_TYPE)
+                .claim("userId", userId.toString())
+                .claim("deviceId", deviceId)
+                .issuedAt(now)
+                .expiration(expiryDate)
+                .signWith(key, Jwts.SIG.HS256)
+                .compact();
+    }
+
+    /**
+     * @throws JwtException se o token for inválido, expirado, ou não for do
+     *         tipo {@code device_challenge} (ex: alguém tentando reusar um
+     *         JWT de sessão normal neste endpoint).
+     */
+    public Claims parseDeviceChallengeToken(String token) {
+        Claims claims = Jwts.parser()
+                .verifyWith(key)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+
+        if (!DEVICE_CHALLENGE_TYPE.equals(claims.get(CHALLENGE_TYPE_CLAIM, String.class))) {
+            throw new JwtException("Token não é um desafio de device válido.");
+        }
+
+        return claims;
     }
 }

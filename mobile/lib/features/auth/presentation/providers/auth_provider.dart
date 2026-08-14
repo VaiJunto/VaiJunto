@@ -4,6 +4,15 @@ import '../../../../core/network/api_exception.dart';
 import '../../data/models/user_model.dart';
 import '../../data/repositories/auth_repository.dart';
 
+/// Sinaliza pro [LoginScreen] navegar pra tela de confirmação de device, em
+/// vez de mostrar um erro. Não é uma falha de fato — o backend só está
+/// pedindo mais um passo antes de emitir a sessão (device novo no login).
+class DeviceVerificationRequired implements Exception {
+  const DeviceVerificationRequired(this.challengeToken);
+
+  final String challengeToken;
+}
+
 final authStateProvider = StateNotifierProvider<AuthNotifier, AsyncValue<UserModel?>>((ref) {
   return AuthNotifier(ref.watch(authRepositoryProvider));
 });
@@ -22,8 +31,15 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserModel?>> {
   Future<void> login(String email, String password) async {
     state = const AsyncValue.loading();
     try {
-      final user = await _repository.login(email, password);
-      state = AsyncValue.data(user);
+      final result = await _repository.login(email, password);
+      if (result.deviceVerificationRequired) {
+        state = AsyncValue.error(
+          DeviceVerificationRequired(result.challengeToken!),
+          StackTrace.current,
+        );
+        return;
+      }
+      state = AsyncValue.data(result.user);
     } on DioException catch (e, st) {
       state = AsyncValue.error(ApiException.fromDio(e), st);
     } catch (e, st) {

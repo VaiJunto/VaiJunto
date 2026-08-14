@@ -1,15 +1,20 @@
 package com.vaijunto.service;
 
 import com.vaijunto.domain.entities.EmailVerificationCode;
+import com.vaijunto.domain.entities.KnownDevice;
 import com.vaijunto.domain.entities.University;
 import com.vaijunto.domain.entities.User;
 import com.vaijunto.domain.enums.ProfileType;
+import com.vaijunto.domain.enums.VerificationCodePurpose;
 import com.vaijunto.dto.*;
 import com.vaijunto.exception.ApiException;
 import com.vaijunto.repository.EmailVerificationCodeRepository;
+import com.vaijunto.repository.KnownDeviceRepository;
 import com.vaijunto.repository.UniversityRepository;
 import com.vaijunto.repository.UserRepository;
 import com.vaijunto.security.JwtTokenProvider;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -24,6 +29,7 @@ import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.EnumSet;
 import java.util.Set;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -32,6 +38,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final UniversityRepository universityRepository;
     private final EmailVerificationCodeRepository verificationCodeRepository;
+    private final KnownDeviceRepository knownDeviceRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider tokenProvider;
@@ -85,7 +92,7 @@ public class AuthService {
 
         User savedUser = userRepository.save(user);
 
-        issueAndSendCode(savedUser);
+        issueAndSendCode(savedUser, VerificationCodePurpose.EMAIL_VERIFICATION);
 
         return RegisterResponse.builder()
                 .email(savedUser.getEmail())
@@ -93,8 +100,14 @@ public class AuthService {
                 .build();
     }
 
-    public AuthResponse login(LoginRequest request) {
+    @Transactional
+    public LoginResponse login(LoginRequest request) {
         String email = request.getEmail() == null ? "" : request.getEmail().trim().toLowerCase();
+        String deviceId = request.getDeviceId() == null ? "" : request.getDeviceId().trim();
+
+        if (deviceId.isBlank()) {
+            throw new IllegalArgumentException("deviceId é obrigatório.");
+        }
 
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(email, request.getPassword())
@@ -110,13 +123,98 @@ public class AuthService {
             throw ApiException.emailNotVerified();
         }
 
-        String token = tokenProvider.generateToken(authentication, user.getId());
+        var knownDevice = knownDeviceRepository.findByUserIdAndDeviceId(user.getId(), deviceId);
+        if (knownDevice.isPresent()) {
+            knownDevice.get().setLastSeenAt(OffsetDateTime.now());
+            knownDeviceRepository.save(knownDevice.get());
+
+            String token = tokenProvider.generateToken(authentication, user.getId());
+            return LoginResponse.authenticated(token, UserDto.fromEntity(user));
+        }
+
+        // Device nunca visto para este usuário: MFA de primeiro acesso — nenhum
+        // JWT de sessão ainda, só um token de troca de curta duração + código
+        // por e-mail. Vira device conhecido só depois de confirmado em verifyDevice.
+        issueAndSendCode(user, VerificationCodePurpose.DEVICE_CHALLENGE);
+        String challengeToken = tokenProvider.generateDeviceChallengeToken(user.getId(), deviceId);
+        return LoginResponse.challenge(challengeToken);
+    }
+
+    /**
+     * Troca o desafio de device (challengeToken + código recebido por
+     * e-mail) por um JWT de sessão de verdade, e marca o device como
+     * conhecido — próximos logins dele não pedem código de novo.
+     */
+    @Transactional
+    public AuthResponse verifyDevice(VerifyDeviceRequest request) {
+        Claims claims;
+        try {
+            claims = tokenProvider.parseDeviceChallengeToken(
+                    request.getChallengeToken() == null ? "" : request.getChallengeToken());
+        } catch (JwtException | IllegalArgumentException ex) {
+            throw ApiException.invalidOrExpiredCode();
+        }
+
+        UUID userId = UUID.fromString(claims.get("userId", String.class));
+        String deviceId = claims.get("deviceId", String.class);
+        String code = request.getCode() == null ? "" : request.getCode().trim();
+
+        User user = userRepository.findById(userId).orElseThrow(ApiException::userNotFound);
+
+        EmailVerificationCode verification = verificationCodeRepository
+                .findFirstByUserIdAndPurposeOrderByCreatedAtDesc(userId, VerificationCodePurpose.DEVICE_CHALLENGE)
+                .orElseThrow(ApiException::invalidOrExpiredCode);
+
+        verification.setAttempts(verification.getAttempts() + 1);
+
+        boolean tooManyAttempts = verification.getAttempts() > 5;
+        if (verification.isConsumed() || verification.isExpired() || tooManyAttempts
+                || !verification.getCode().equals(code)) {
+            verificationCodeRepository.save(verification);
+            throw ApiException.invalidOrExpiredCode();
+        }
+
+        verification.setConsumedAt(OffsetDateTime.now());
+        verificationCodeRepository.save(verification);
+
+        knownDeviceRepository.save(KnownDevice.builder()
+                .user(user)
+                .deviceId(deviceId)
+                .lastSeenAt(OffsetDateTime.now())
+                .build());
+
+        String token = tokenProvider.generateToken(user.getEmail(), user.getId());
 
         return AuthResponse.builder()
                 .token(token)
                 .tokenType("Bearer")
                 .user(UserDto.fromEntity(user))
                 .build();
+    }
+
+    @Transactional
+    public void resendDeviceCode(ResendDeviceCodeRequest request) {
+        Claims claims;
+        try {
+            claims = tokenProvider.parseDeviceChallengeToken(
+                    request.getChallengeToken() == null ? "" : request.getChallengeToken());
+        } catch (JwtException | IllegalArgumentException ex) {
+            throw ApiException.invalidOrExpiredCode();
+        }
+
+        UUID userId = UUID.fromString(claims.get("userId", String.class));
+        User user = userRepository.findById(userId).orElseThrow(ApiException::userNotFound);
+
+        verificationCodeRepository
+                .findFirstByUserIdAndPurposeOrderByCreatedAtDesc(userId, VerificationCodePurpose.DEVICE_CHALLENGE)
+                .ifPresent(last -> {
+                    long secondsSinceLast = ChronoUnit.SECONDS.between(last.getCreatedAt(), OffsetDateTime.now());
+                    if (secondsSinceLast < resendCooldownSeconds) {
+                        throw ApiException.rateLimited((int) (resendCooldownSeconds - secondsSinceLast));
+                    }
+                });
+
+        issueAndSendCode(user, VerificationCodePurpose.DEVICE_CHALLENGE);
     }
 
     /**
@@ -136,7 +234,7 @@ public class AuthService {
         }
 
         EmailVerificationCode verification = verificationCodeRepository
-                .findFirstByUserIdOrderByCreatedAtDesc(user.getId())
+                .findFirstByUserIdAndPurposeOrderByCreatedAtDesc(user.getId(), VerificationCodePurpose.EMAIL_VERIFICATION)
                 .orElseThrow(ApiException::invalidOrExpiredCode);
 
         verification.setAttempts(verification.getAttempts() + 1);
@@ -158,6 +256,18 @@ public class AuthService {
         user.setEmailVerified(true);
         userRepository.save(user);
 
+        // Provar o e-mail aqui já vale como prova de device também — sem
+        // isso, o próximo login neste mesmo celular pediria o código de novo
+        // minutos depois do cadastro, o que pareceria (e seria) redundante.
+        String deviceId = request.getDeviceId() == null ? "" : request.getDeviceId().trim();
+        if (!deviceId.isBlank() && knownDeviceRepository.findByUserIdAndDeviceId(user.getId(), deviceId).isEmpty()) {
+            knownDeviceRepository.save(KnownDevice.builder()
+                    .user(user)
+                    .deviceId(deviceId)
+                    .lastSeenAt(OffsetDateTime.now())
+                    .build());
+        }
+
         String token = tokenProvider.generateToken(user.getEmail(), user.getId());
 
         return AuthResponse.builder()
@@ -178,7 +288,8 @@ public class AuthService {
             throw ApiException.alreadyVerified();
         }
 
-        verificationCodeRepository.findFirstByUserIdOrderByCreatedAtDesc(user.getId())
+        verificationCodeRepository
+                .findFirstByUserIdAndPurposeOrderByCreatedAtDesc(user.getId(), VerificationCodePurpose.EMAIL_VERIFICATION)
                 .ifPresent(last -> {
                     long secondsSinceLast = ChronoUnit.SECONDS.between(last.getCreatedAt(), OffsetDateTime.now());
                     if (secondsSinceLast < resendCooldownSeconds) {
@@ -186,15 +297,16 @@ public class AuthService {
                     }
                 });
 
-        issueAndSendCode(user);
+        issueAndSendCode(user, VerificationCodePurpose.EMAIL_VERIFICATION);
     }
 
-    private void issueAndSendCode(User user) {
+    private void issueAndSendCode(User user, VerificationCodePurpose purpose) {
         String code = String.format("%06d", RANDOM.nextInt(1_000_000));
 
         EmailVerificationCode verification = EmailVerificationCode.builder()
                 .user(user)
                 .code(code)
+                .purpose(purpose)
                 .expiresAt(OffsetDateTime.now().plusMinutes(codeExpiryMinutes))
                 .attempts(0)
                 .build();

@@ -19,10 +19,31 @@ class AuthRepository {
   // Os DioException sobem intactos de propósito: quem trata (AuthNotifier)
   // converte para ApiException e extrai a mensagem que o backend mandou.
   // Embrulhar aqui num Exception genérico faria vazar o stack cru para a tela.
-  Future<UserModel> login(String email, String password) async {
+  Future<LoginResult> login(String email, String password) async {
+    final deviceId = await _storage.getOrCreateDeviceId();
+
     final response = await _dio.post('/auth/login', data: {
       'email': email,
       'password': password,
+      'deviceId': deviceId,
+    });
+
+    final result = LoginResult.fromJson(response.data);
+    if (!result.deviceVerificationRequired) {
+      await _storage.saveToken(result.token!);
+      await _storage.saveUserId(result.user!.id);
+    }
+
+    return result;
+  }
+
+  /// Troca o challengeToken (device novo no login) + o código recebido por
+  /// e-mail por uma sessão de verdade — mesma forma de resposta do login
+  /// normal/verifyEmail, já autenticado.
+  Future<UserModel> verifyDevice(String challengeToken, String code) async {
+    final response = await _dio.post('/auth/verify-device', data: {
+      'challengeToken': challengeToken,
+      'code': code,
     });
 
     final authData = AuthResponse.fromJson(response.data);
@@ -32,6 +53,12 @@ class AuthRepository {
     return authData.user;
   }
 
+  Future<void> resendDeviceCode(String challengeToken) async {
+    await _dio.post('/auth/resend-device-code', data: {
+      'challengeToken': challengeToken,
+    });
+  }
+
   /// Sem token de propósito — a conta só fica utilizável após [verifyEmail].
   Future<RegisterResult> register(Map<String, dynamic> requestData) async {
     final response = await _dio.post('/auth/register', data: requestData);
@@ -39,11 +66,16 @@ class AuthRepository {
   }
 
   /// O código confirmado já é o login: o backend devolve token igual ao de
-  /// login/register bem-sucedido.
+  /// login/register bem-sucedido. Manda o deviceId junto para que este
+  /// aparelho já saia do cadastro marcado como conhecido — sem isso, o
+  /// próximo login neste mesmo device pediria o desafio de MFA de novo.
   Future<UserModel> verifyEmail(String email, String code) async {
+    final deviceId = await _storage.getOrCreateDeviceId();
+
     final response = await _dio.post('/auth/verify-email', data: {
       'email': email,
       'code': code,
+      'deviceId': deviceId,
     });
 
     final authData = AuthResponse.fromJson(response.data);

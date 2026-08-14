@@ -11,6 +11,7 @@ import '../../../../core/ui/neo_loading_indicator.dart';
 import '../../../../core/validation/auth_validators.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/vaijunto_logo.dart';
+import 'device_verification_screen.dart';
 import 'register_screen.dart';
 import 'verify_email_screen.dart';
 
@@ -60,6 +61,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     ref.listen(authStateProvider, (previous, next) {
       next.whenOrNull(
         error: (error, _) {
+          if (error is DeviceVerificationRequired) {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => DeviceVerificationScreen(
+                  challengeToken: error.challengeToken,
+                ),
+              ),
+            );
+            return;
+          }
           if (error is ApiException && error.code == 'EMAIL_NOT_VERIFIED') {
             Navigator.of(context).push(
               MaterialPageRoute(

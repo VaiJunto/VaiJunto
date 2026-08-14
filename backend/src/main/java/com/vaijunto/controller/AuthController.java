@@ -25,8 +25,8 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest request) {
-        AuthResponse response = authService.login(request);
+    public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
+        LoginResponse response = authService.login(request);
         return ResponseEntity.ok(response);
     }
 
@@ -39,6 +39,22 @@ public class AuthController {
     @PostMapping("/resend-verification")
     public ResponseEntity<Void> resendVerification(@RequestBody ResendVerificationRequest request) {
         authService.resendVerificationCode(request);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Troca challengeToken + código do desafio de device (device novo no
+     * login) por um JWT de sessão de verdade.
+     */
+    @PostMapping("/verify-device")
+    public ResponseEntity<AuthResponse> verifyDevice(@RequestBody VerifyDeviceRequest request) {
+        AuthResponse response = authService.verifyDevice(request);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/resend-device-code")
+    public ResponseEntity<Void> resendDeviceCode(@RequestBody ResendDeviceCodeRequest request) {
+        authService.resendDeviceCode(request);
         return ResponseEntity.noContent().build();
     }
 

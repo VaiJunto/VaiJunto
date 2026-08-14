@@ -1,7 +1,7 @@
 name: vaijunto
 description: App de Transporte Universitário (VaiJunto) - Caronas e Vans.
 publish_to: 'none'
-version: 1.7.4+23
+version: 1.8.0+24
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

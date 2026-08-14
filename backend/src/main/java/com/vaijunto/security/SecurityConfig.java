@@ -56,7 +56,9 @@ public class SecurityConfig {
                                 "/api/v1/auth/register",
                                 "/api/v1/auth/login",
                                 "/api/v1/auth/verify-email",
-                                "/api/v1/auth/resend-verification")
+                                "/api/v1/auth/resend-verification",
+                                "/api/v1/auth/verify-device",
+                                "/api/v1/auth/resend-device-code")
                         .permitAll()
                         // /api/v1/auth/me fica de fora do permitAll acima de propósito:
                         // é o endpoint que o app usa para restaurar sessão, precisa do token.
