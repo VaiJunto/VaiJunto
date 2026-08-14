@@ -127,10 +127,10 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
 
     return AuthVisualShell(
       code: 'VJ//EMAIL_HANDSHAKE',
-      title: 'Confirme o sinal',
+      title: 'Confirme o código',
       description:
-          'Use os seis dígitos enviados para provar que este endereço institucional é seu.',
-      stepLabel: _hasFreshCode ? 'CÓDIGO ATIVO' : 'SINCRONIZANDO',
+          'Digite o código de seis dígitos enviado para o seu e-mail institucional.',
+      stepLabel: _hasFreshCode ? 'CÓDIGO ENVIADO' : 'ENVIANDO CÓDIGO',
       showBack: true,
       content: NeoCard(
         color: scheme.surface,
@@ -159,8 +159,8 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                       children: [
                         Text(
                           _hasFreshCode
-                              ? 'DESTINO CONFIRMADO'
-                              : 'ABRINDO CANAL',
+                              ? 'CÓDIGO ENVIADO PARA'
+                              : 'ENVIANDO CÓDIGO PARA',
                           style: theme.textTheme.labelMedium,
                         ),
                         const SizedBox(height: 2),
@@ -230,7 +230,7 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                 trailing: _isVerifying ? null : const Icon(Icons.check_rounded),
                 child: _isVerifying
                     ? const NeoLoadingIndicator(compact: true)
-                    : const Text('CONFIRMAR ACESSO'),
+                    : const Text('CONFIRMAR CÓDIGO'),
               ),
             ],
           ),

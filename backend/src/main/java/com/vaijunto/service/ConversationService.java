@@ -1,0 +1,4 @@
+package com.vaijunto.service;
+import com.vaijunto.dto.ConversationDto; import com.vaijunto.exception.ApiException; import com.vaijunto.repository.*; import lombok.RequiredArgsConstructor; import org.springframework.stereotype.Service; import org.springframework.transaction.annotation.Transactional; import java.time.*; import java.util.*;
+@Service @RequiredArgsConstructor public class ConversationService { private final ConversationRepository conversations; private final UserRepository users;
+ @Transactional(readOnly=true) public List<ConversationDto> list(String email){var u=users.findByEmail(email).orElseThrow(ApiException::userNotFound);return conversations.findForUser(u.getId()).stream().map(c->{if(c.getReadOnlyAt()==null&&c.getRide()!=null&&c.getRide().getActualEnd()!=null&&c.getRide().getActualEnd().plusHours(24).isBefore(OffsetDateTime.now()))c.setReadOnlyAt(c.getRide().getActualEnd().plusHours(24));return ConversationDto.from(c,u.getId());}).toList();}}

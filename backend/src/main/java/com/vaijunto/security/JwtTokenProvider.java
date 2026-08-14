@@ -57,6 +57,22 @@ public class JwtTokenProvider {
                 .compact();
     }
 
+    public String generateAdminToken(String email, UUID adminId, String role) {
+        Date now = new Date();
+        return Jwts.builder().subject(email).claim("actor", "admin").claim("adminId", adminId.toString())
+                .claim("role", role).issuedAt(now).expiration(new Date(now.getTime() + jwtExpirationInMs))
+                .signWith(key, Jwts.SIG.HS256).compact();
+    }
+
+    public boolean isAdminToken(String token) {
+        Claims claims = Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
+        return "admin".equals(claims.get("actor", String.class));
+    }
+
+    public String getRoleFromToken(String token) {
+        return Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload().get("role", String.class);
+    }
+
     public String getUsernameFromToken(String token) {
         Claims claims = Jwts.parser()
                 .verifyWith(key)

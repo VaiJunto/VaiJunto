@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import '../theme/neo_brutal_theme.dart';
 
 class NeoBottomNavDestination {
-  const NeoBottomNavDestination({required this.icon, required this.label});
+  const NeoBottomNavDestination(
+      {required this.icon, required this.label, this.badgeCount = 0});
 
   final IconData icon;
   final String label;
+  final int badgeCount;
 }
 
 /// Uma única peça de navegação para economizar altura e reduzir ruído visual.
@@ -68,7 +70,31 @@ class NeoBottomNavBar extends StatelessWidget {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(destination.icon, size: 21, color: foreground),
+                            Stack(clipBehavior: Clip.none, children: [
+                              Icon(destination.icon,
+                                  size: 21, color: foreground),
+                              if (destination.badgeCount > 0)
+                                Positioned(
+                                    right: -9,
+                                    top: -8,
+                                    child: Container(
+                                        constraints: const BoxConstraints(
+                                            minWidth: 16, minHeight: 16),
+                                        alignment: Alignment.center,
+                                        decoration: BoxDecoration(
+                                            color: scheme.primary,
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                                color: scheme.ink, width: 1.5)),
+                                        child: Text(
+                                            destination.badgeCount > 9
+                                                ? '9+'
+                                                : '${destination.badgeCount}',
+                                            style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 8,
+                                                fontWeight: FontWeight.w900))))
+                            ]),
                             const SizedBox(height: 4),
                             Text(
                               destination.label.toUpperCase(),

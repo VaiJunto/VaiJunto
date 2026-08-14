@@ -196,10 +196,19 @@ de rota usa `ColorScheme.ink`.
 - A versão permanece no rodapé fixo das duas telas, separada do conteúdo rolável.
 - Tipo de transporte não pertence ao cadastro da pessoa. Qualquer conta pode
   pedir ou oferecer; características como van/fretado pertencem à publicação.
-- Confirmação de e-mail mostra destino, estado do envio e campo de seis dígitos
+- Confirmação de e-mail mostra endereço, estado do envio e campo de seis dígitos
   no mesmo bloco. Reenvio é ação secundária e expõe o cooldown claramente.
-- A voz futurista nunca substitui a tarefa: `VJ//EMAIL_HANDSHAKE` acompanha
-  `Confirme o sinal`, mas a descrição sempre explica o que fazer em português.
+- A camada futurista fica em identificadores decorativos como
+  `VJ//EMAIL_HANDSHAKE`. Títulos, estados, campos e ações sempre usam o nome
+  literal da tarefa, como `Confirme o código`, `CÓDIGO ENVIADO` e
+  `CONFIRMAR CÓDIGO`, sem transformar funções reais em roleplay.
+- E-mails transacionais seguem a mesma hierarquia: papel claro, tinta escura,
+  blocos físicos, magenta para a ação e códigos operacionais em ciano. O código
+  de confirmação é o maior elemento da mensagem e mantém contraste alto.
+- A temática pode usar formato de comprovante, rota e metadados funcionais, mas
+  nunca depende de GIF, imagem externa, emoji ou animação para comunicar. Corpo
+  em 16 px ou mais, instrução literal e validade visível preservam a leitura em
+  telas pequenas e para pessoas com baixa visão.
 
 ### Estados vazios
 

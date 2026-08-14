@@ -18,6 +18,9 @@ public class OfferController {
 
     private final OfferService offerService;
 
+    @GetMapping("/mine") public List<OfferDto> mine(Authentication authentication) { return offerService.findMine(authentication.getName()); }
+    @GetMapping public com.vaijunto.dto.PageResponse<OfferDto> browse(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) { return offerService.browse(page, size); }
+
     @GetMapping("/nearby")
     public ResponseEntity<List<OfferDto>> getNearbyOffers(
             @RequestParam double lat,

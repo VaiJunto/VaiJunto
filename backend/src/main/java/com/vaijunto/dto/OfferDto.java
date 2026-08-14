@@ -15,11 +15,14 @@ import java.util.UUID;
 public class OfferDto {
     private UUID id;
     private UUID routeId;
+    private UUID vehicleId;
     private UUID driverId;
     private String driverName;
     private String routeName;
     private String originName;
     private String destinationName;
+    private LocationDto originLocation;
+    private LocationDto destinationLocation;
     private Integer availableSeats;
     private BigDecimal price;
     private OffsetDateTime departureAt;

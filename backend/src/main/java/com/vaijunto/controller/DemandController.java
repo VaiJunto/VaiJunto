@@ -18,6 +18,9 @@ public class DemandController {
 
     private final DemandService demandService;
 
+    @GetMapping("/mine") public List<DemandDto> mine(Authentication authentication) { return demandService.findMine(authentication.getName()); }
+    @GetMapping public com.vaijunto.dto.PageResponse<DemandDto> browse(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) { return demandService.browse(page, size); }
+
     @GetMapping("/nearby")
     public ResponseEntity<List<DemandDto>> getNearbyDemands(
             @RequestParam double lat,
@@ -36,4 +39,6 @@ public class DemandController {
         DemandDto demand = demandService.createDemand(request, authentication.getName());
         return ResponseEntity.status(HttpStatus.CREATED).body(demand);
     }
+    @PutMapping("/{id}") public DemandDto update(@PathVariable java.util.UUID id, @RequestBody CreateDemandRequest request, Authentication authentication) { return demandService.updateDemand(id, request, authentication.getName()); }
+    @DeleteMapping("/{id}") public ResponseEntity<Void> cancel(@PathVariable java.util.UUID id, Authentication authentication) { demandService.cancelDemand(id, authentication.getName()); return ResponseEntity.noContent().build(); }
 }

@@ -30,9 +30,13 @@ class DemandModel {
       passengerId: json['passengerId'],
       passengerName: json['passengerName'] as String? ?? 'Passageiro',
       originName: json['originName'],
-      originLocation: LocationModel.fromJson(json['originLocation']),
+      originLocation: json['originLocation'] == null
+          ? LocationModel(latitude: 0, longitude: 0)
+          : LocationModel.fromJson(json['originLocation']),
       destinationName: json['destinationName'],
-      destinationLocation: LocationModel.fromJson(json['destinationLocation']),
+      destinationLocation: json['destinationLocation'] == null
+          ? LocationModel(latitude: 0, longitude: 0)
+          : LocationModel.fromJson(json['destinationLocation']),
       desiredTime: parseApiDateTime(json['desiredTime']),
       status: json['status'],
     );

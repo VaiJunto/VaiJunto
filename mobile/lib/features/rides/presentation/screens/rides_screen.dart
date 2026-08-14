@@ -30,6 +30,10 @@ class RidesScreen extends ConsumerStatefulWidget {
 
 class _RidesScreenState extends ConsumerState<RidesScreen> {
   RideFeedMode _mode = RideFeedMode.offers;
+  TripDirectionFilter _direction = TripDirectionFilter.any;
+  DateTime? _date;
+  TimeOfDay? _time;
+  String _neighborhood = '';
 
   void _refresh() {
     if (_mode == RideFeedMode.offers) {
@@ -46,6 +50,8 @@ class _RidesScreenState extends ConsumerState<RidesScreen> {
     final offers = ref.watch(nearbyOffersProvider(kFatecLocation));
     final demands = ref.watch(nearbyDemandsProvider(kFatecLocation));
     final current = _mode == RideFeedMode.offers ? offers : demands;
+    final filteredOffers = _filterOffers(offers.valueOrNull ?? const []);
+    final filteredDemands = _filterDemands(demands.valueOrNull ?? const []);
 
     return SafeArea(
       top: false,
@@ -103,6 +109,36 @@ class _RidesScreenState extends ConsumerState<RidesScreen> {
                         label: 'Pedidos de carona', icon: Icons.hail_rounded),
                   ],
                 ),
+                const SizedBox(height: 10),
+                _FeedFilters(
+                  direction: _direction,
+                  date: _date,
+                  time: _time,
+                  neighborhood: _neighborhood,
+                  onDirection: (value) => setState(() => _direction = value),
+                  onDate: () async {
+                    final result = await showDatePicker(
+                        context: context,
+                        initialDate: _date ?? DateTime.now(),
+                        firstDate: DateTime.now(),
+                        lastDate: DateTime.now().add(const Duration(days: 90)));
+                    if (result != null) setState(() => _date = result);
+                  },
+                  onTime: () async {
+                    final result = await showTimePicker(
+                        context: context,
+                        initialTime: _time ?? TimeOfDay.now());
+                    if (result != null) setState(() => _time = result);
+                  },
+                  onNeighborhood: (value) =>
+                      setState(() => _neighborhood = value),
+                  onClear: () => setState(() {
+                    _direction = TripDirectionFilter.any;
+                    _date = null;
+                    _time = null;
+                    _neighborhood = '';
+                  }),
+                ),
               ],
             ),
           ),
@@ -113,11 +149,11 @@ class _RidesScreenState extends ConsumerState<RidesScreen> {
               error: (_, __) => _FeedError(onRetry: _refresh),
               data: (_) => _mode == RideFeedMode.offers
                   ? _OfferList(
-                      offers: offers.valueOrNull ?? const [],
+                      offers: filteredOffers,
                       onCreate: widget.onCreateOffer,
                     )
                   : _DemandList(
-                      demands: demands.valueOrNull ?? const [],
+                      demands: filteredDemands,
                       onCreate: widget.onCreateDemand,
                     ),
             ),
@@ -126,6 +162,99 @@ class _RidesScreenState extends ConsumerState<RidesScreen> {
       ),
     );
   }
+
+  bool _matches(
+      {required String origin,
+      required String destination,
+      required DateTime time}) {
+    final directionMatches = _direction == TripDirectionFilter.any ||
+        (_direction == TripDirectionFilter.toFatec
+            ? destination.toUpperCase().contains('FATEC')
+            : origin.toUpperCase().contains('FATEC'));
+    final dateMatches = _date == null ||
+        (time.year == _date!.year &&
+            time.month == _date!.month &&
+            time.day == _date!.day);
+    final timeMatches = _time == null ||
+        (time.hour == _time!.hour && (time.minute - _time!.minute).abs() <= 60);
+    final needle = _neighborhood.trim().toLowerCase();
+    return directionMatches &&
+        dateMatches &&
+        timeMatches &&
+        (needle.isEmpty ||
+            origin.toLowerCase().contains(needle) ||
+            destination.toLowerCase().contains(needle));
+  }
+
+  List<OfferModel> _filterOffers(List<OfferModel> values) => values
+      .where((item) => _matches(
+          origin: item.originName,
+          destination: item.destinationName,
+          time: item.departureAt))
+      .toList();
+  List<DemandModel> _filterDemands(List<DemandModel> values) => values
+      .where((item) => _matches(
+          origin: item.originName,
+          destination: item.destinationName,
+          time: item.desiredTime))
+      .toList();
+}
+
+enum TripDirectionFilter { any, toFatec, fromFatec }
+
+class _FeedFilters extends StatelessWidget {
+  const _FeedFilters(
+      {required this.direction,
+      required this.date,
+      required this.time,
+      required this.neighborhood,
+      required this.onDirection,
+      required this.onDate,
+      required this.onTime,
+      required this.onNeighborhood,
+      required this.onClear});
+  final TripDirectionFilter direction;
+  final DateTime? date;
+  final TimeOfDay? time;
+  final String neighborhood;
+  final ValueChanged<TripDirectionFilter> onDirection;
+  final VoidCallback onDate, onTime, onClear;
+  final ValueChanged<String> onNeighborhood;
+  @override
+  Widget build(BuildContext context) =>
+      Wrap(spacing: 7, runSpacing: 7, children: [
+        ChoiceChip(
+            label: const Text('TODAS'),
+            selected: direction == TripDirectionFilter.any,
+            onSelected: (_) => onDirection(TripDirectionFilter.any)),
+        ChoiceChip(
+            label: const Text('INDO À FATEC'),
+            selected: direction == TripDirectionFilter.toFatec,
+            onSelected: (_) => onDirection(TripDirectionFilter.toFatec)),
+        ChoiceChip(
+            label: const Text('SAINDO DA FATEC'),
+            selected: direction == TripDirectionFilter.fromFatec,
+            onSelected: (_) => onDirection(TripDirectionFilter.fromFatec)),
+        ActionChip(
+            label: Text(date == null
+                ? 'DATA'
+                : '${date!.day.toString().padLeft(2, '0')}/${date!.month.toString().padLeft(2, '0')}'),
+            onPressed: onDate),
+        ActionChip(
+            label: Text(time == null ? 'HORÁRIO' : time!.format(context)),
+            onPressed: onTime),
+        SizedBox(
+            width: 130,
+            child: TextField(
+                onChanged: onNeighborhood,
+                decoration:
+                    const InputDecoration(isDense: true, hintText: 'Bairro'))),
+        if (direction != TripDirectionFilter.any ||
+            date != null ||
+            time != null ||
+            neighborhood.isNotEmpty)
+          ActionChip(label: const Text('LIMPAR'), onPressed: onClear),
+      ]);
 }
 
 class _OfferList extends StatelessWidget {

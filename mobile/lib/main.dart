@@ -7,6 +7,7 @@ import 'core/ui/neo_street_backdrop.dart';
 import 'features/auth/presentation/providers/auth_provider.dart';
 import 'features/auth/presentation/screens/login_screen.dart';
 import 'features/auth/presentation/widgets/vaijunto_logo.dart';
+import 'features/admin/presentation/screens/desktop_admin_entry_screen.dart';
 import 'features/home/presentation/screens/home_screen.dart';
 
 void main() {
@@ -28,9 +29,17 @@ class VaiJuntoApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: buildNeoBrutalTheme(Brightness.light),
       darkTheme: buildNeoBrutalTheme(Brightness.dark),
-      home: const _AppStartup(),
+      home: const _ResponsiveEntry(),
     );
   }
+}
+
+class _ResponsiveEntry extends StatelessWidget {
+  const _ResponsiveEntry();
+  @override
+  Widget build(BuildContext context) => MediaQuery.sizeOf(context).width >= 700
+      ? const DesktopAdminEntryScreen()
+      : const _AppStartup();
 }
 
 /// Tela raiz: espera a restauração de sessão terminar antes de decidir entre

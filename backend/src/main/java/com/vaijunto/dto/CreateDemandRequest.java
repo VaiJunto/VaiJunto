@@ -15,4 +15,5 @@ public class CreateDemandRequest {
     private String destinationName;
     private LocationDto destinationLocation;
     private OffsetDateTime desiredTime;
+    private OffsetDateTime latestTime;
 }

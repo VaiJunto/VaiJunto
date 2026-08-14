@@ -1,0 +1,1 @@
+package com.vaijunto.repository; import com.vaijunto.domain.entities.AdminInvite; import org.springframework.data.jpa.repository.JpaRepository; import java.util.*; public interface AdminInviteRepository extends JpaRepository<AdminInvite,UUID>{Optional<AdminInvite> findByTokenHash(String hash);}

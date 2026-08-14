@@ -1,0 +1,10 @@
+ALTER TABLE users ADD COLUMN requested_full_name VARCHAR(255);
+CREATE TABLE admin_invites (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(), email VARCHAR(255) NOT NULL,
+  role VARCHAR(30) NOT NULL CHECK (role IN ('SUPER_ADMIN','ADMIN','MODERATOR')),
+  token_hash VARCHAR(64) NOT NULL UNIQUE, expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  consumed_at TIMESTAMP WITH TIME ZONE, invited_by UUID NOT NULL REFERENCES admin_accounts(id), created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW());
+CREATE TABLE admin_recovery_tokens (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(), admin_id UUID NOT NULL REFERENCES admin_accounts(id),
+  token_hash VARCHAR(64) NOT NULL UNIQUE, expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  consumed_at TIMESTAMP WITH TIME ZONE, created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW());
