@@ -1,6 +1,7 @@
 package com.vaijunto.security;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -28,6 +29,12 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
+    // Dev (default): qualquer porta em localhost/127.0.0.1, para o Flutter web
+    // dev server (porta aleatoria) e `flutter run -d chrome`. Prod: a VPS define
+    // CORS_ALLOWED_ORIGINS=https://vaijunto.app.br no .env (ver DEPLOY.md).
+    @Value("${app.cors.allowed-origins:http://localhost:*,http://127.0.0.1:*}")
+    private List<String> allowedOrigins;
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
@@ -53,6 +60,7 @@ public class SecurityConfig {
                         .permitAll()
                         // /api/v1/auth/me fica de fora do permitAll acima de propósito:
                         // é o endpoint que o app usa para restaurar sessão, precisa do token.
+                        .requestMatchers("/api/v1/health").permitAll()
                         .requestMatchers("/actuator/**", "/ws/**").permitAll()
                         .anyRequest().authenticated()
                 )
@@ -62,16 +70,14 @@ public class SecurityConfig {
     }
 
     /**
-     * CORS liberado apenas para localhost, em qualquer porta.
-     *
-     * Necessário para rodar o app via `flutter run -d chrome` durante o
-     * desenvolvimento (o Flutter web sobe numa porta aleatória). Em produção
-     * este bean deve ser restringido ao domínio real do front.
+     * Origens liberadas via {@code app.cors.allowed-origins} (lista separada por
+     * vírgula), com default de dev (localhost em qualquer porta). Ver o campo
+     * {@link #allowedOrigins} para a variável de ambiente correspondente na VPS.
      */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOriginPatterns(List.of("http://localhost:*", "http://127.0.0.1:*"));
+        config.setAllowedOriginPatterns(allowedOrigins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);

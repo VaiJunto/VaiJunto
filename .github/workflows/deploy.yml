@@ -15,7 +15,7 @@ permissions:
   packages: write
 
 jobs:
-  build:
+  build-backend:
     runs-on: ubuntu-latest
 
     steps:
@@ -40,11 +40,41 @@ jobs:
           tags: |
             ghcr.io/vaijunto/vaijunto-backend:latest
             ghcr.io/vaijunto/vaijunto-backend:sha-${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+  build-web:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Login no GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build e Push do Flutter Web (PWA)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./mobile
+          push: true
+          build-args: |
+            API_BASE_URL=https://api.vaijunto.app.br/api/v1
+          tags: |
+            ghcr.io/vaijunto/vaijunto-web:latest
+            ghcr.io/vaijunto/vaijunto-web:sha-${{ github.sha }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
 
   deploy:
-    needs: build
+    needs: [build-backend, build-web]
     runs-on: ubuntu-latest
     environment: production
 

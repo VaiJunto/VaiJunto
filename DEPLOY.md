@@ -11,16 +11,21 @@
 ```text
 push/merge na main
   → GitHub Actions (.github/workflows/deploy.yml)
-    → build da imagem Docker (contexto: backend/, Dockerfile: backend/Dockerfile)
-    → push para ghcr.io/vaijunto/vaijunto-backend:latest
-                e ghcr.io/vaijunto/vaijunto-backend:sha-<commit>
-    → aguarda aprovação do environment "production"
+    → build-backend: imagem Docker (contexto: backend/, Dockerfile: backend/Dockerfile)
+        → push para ghcr.io/vaijunto/vaijunto-backend:latest
+                    e ghcr.io/vaijunto/vaijunto-backend:sha-<commit>
+    → build-web: imagem Docker do Flutter Web/PWA (contexto: mobile/, Dockerfile: mobile/Dockerfile)
+        → build-arg API_BASE_URL=https://api.vaijunto.app.br/api/v1 (compilado no bundle,
+          ver mobile/lib/core/network/api_client.dart)
+        → push para ghcr.io/vaijunto/vaijunto-web:latest
+                    e ghcr.io/vaijunto/vaijunto-web:sha-<commit>
+    → aguarda aprovação do environment "production" (depende dos dois builds acima)
   → (usuário aprova no GitHub)
   → SSH na VPS (secrets VPS_HOST / VPS_USER / VPS_SSH_KEY)
     → executa /opt/apps/vaijunto/deploy.sh
       → docker compose pull
       → docker compose up -d
-  → api.vaijunto.app.br atualizada
+  → api.vaijunto.app.br e vaijunto.app.br atualizados
 ```
 
 A tag `sha-<commit>` é publicada para permitir rollback manual (fixar
@@ -79,9 +84,38 @@ services:
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
     ports:
       - "127.0.0.1:8080:8080"   # só loopback — Caddy é quem expõe pra internet
+
+  web:
+    image: ${WEB_IMAGE}
+    container_name: vaijunto-web
+    restart: unless-stopped
+    # SEM "depends_on: backend" — o PWA e estático (nginx servindo o build do
+    # Flutter Web), a URL da API ja foi compilada no bundle via API_BASE_URL
+    # (build-arg do mobile/Dockerfile). Não precisa do backend no ar pra subir.
+    ports:
+      - "127.0.0.1:8081:80"   # só loopback — mesmo padrão do backend, Caddy expõe pra internet
 ```
+
+### 2.2 Caddyfile de referência (roteamento por domínio)
+
+Modelo para conferir contra o Caddyfile real da VPS — dois domínios, cada um
+apontando para o container correspondente via loopback:
+
+```caddyfile
+vaijunto.app.br {
+    reverse_proxy 127.0.0.1:8081
+}
+
+api.vaijunto.app.br {
+    reverse_proxy 127.0.0.1:8080
+}
+```
+
+Caddy cuida do certificado HTTPS de ambos os domínios automaticamente (ACME/Let's
+Encrypt) — nenhuma configuração extra de TLS é necessária aqui.
 
 **Nota sobre nomes de variável de banco**: o `.env` atual da VPS usa
 `SPRING_DATASOURCE_URL` / `SPRING_DATASOURCE_USERNAME` /
@@ -95,7 +129,7 @@ e [REQUIREMENTS.md](REQUIREMENTS.md#51-banco-de-dados--postgresql-nativo-não-us
 se for recriar o `.env` do zero, prefira `DB_HOST`/`DB_PORT`/`DB_NAME`/`DB_USER`/`DB_PASS`
 para ficar alinhado com o resto do projeto.
 
-### 2.2 `.env` da VPS — variáveis esperadas
+### 2.3 `.env` da VPS — variáveis esperadas
 
 ```env
 POSTGRES_DB=vaijunto
@@ -109,6 +143,14 @@ MAIL_USERNAME=<secreto>
 MAIL_PASSWORD=<secreto>
 JWT_SECRET=<secreto, gerar um valor forte próprio — não usar o default do application.yml>
 
+# Origem do PWA liberada no CORS do backend (ver SecurityConfig.java). Sem
+# essa variável, o backend cai no default de dev (localhost) e o vaijunto.app.br
+# em produção não consegue chamar a API (bloqueado por CORS no navegador).
+CORS_ALLOWED_ORIGINS=https://vaijunto.app.br
+
+# Imagem do frontend (Flutter Web/PWA) publicada pelo job build-web do CI.
+WEB_IMAGE=ghcr.io/vaijunto/vaijunto-web:latest
+
 BACKEND_IMAGE=ghcr.io/vaijunto/vaijunto-backend:latest
 ```
 
@@ -117,7 +159,7 @@ tem um valor default hardcoded. Ele só é usado se `JWT_SECRET` não estiver
 definido — **confirme que a VPS define `JWT_SECRET` com um valor próprio**,
 nunca o default do repositório (esse default vale para dev local).
 
-### 2.3 `deploy.sh` (conteúdo real, confirmado em `/opt/apps/vaijunto/deploy.sh`)
+### 2.4 `deploy.sh` (conteúdo real, confirmado em `/opt/apps/vaijunto/deploy.sh`)
 
 ```bash
 #!/bin/bash
@@ -168,6 +210,7 @@ container iniciou.
 - [x] UFW liberando só 22, 80, 443
 - [x] Postgres sem bind de porta pública (só rede interna do compose)
 - [x] Backend só em `127.0.0.1:8080`, nunca exposto direto
+- [x] Frontend (Flutter Web/PWA) só em `127.0.0.1:8081`, nunca exposto direto — mesmo padrão do backend
 - [x] Caddy na frente, HTTPS ativo em `vaijunto.app.br` / `api.vaijunto.app.br`
 - [x] Usuário `deploy` dedicado, sem sudo geral
 - [x] Deploy só via GitHub Actions + environment `production` com aprovação manual
@@ -271,14 +314,7 @@ serviço de heartbeat (healthchecks.io, cron-monitor) resolve isso.
   Sem `--dart-define`, o app aponta para `http://127.0.0.1:8080/api/v1`
   (ver [mobile/lib/core/network/api_client.dart](mobile/lib/core/network/api_client.dart)).
 
-### 5.1 Build de produção do app mobile
-
-Não existe `mobile/web/` no repositório — **Flutter Web não é uma plataforma
-real deste projeto** (o `-Web` do `dev.ps1` é só `flutter run -d web-server`
-para hot reload local; não há build/deploy de web para a VPS). O app é
-Android via APK/AAB.
-
-Para apontar um build para produção:
+### 5.1 Build de produção do app mobile (Android)
 
 ```bash
 flutter build apk --release --dart-define=API_BASE_URL=https://api.vaijunto.app.br/api/v1
@@ -287,8 +323,52 @@ flutter build apk --release --dart-define=API_BASE_URL=https://api.vaijunto.app.
 Sem essa flag, o build usa o default de dev (`127.0.0.1:8080`) — build de
 release feito sem `--dart-define` **não vai funcionar fora da rede local**.
 
+### 5.2 Flutter Web / PWA
+
+Atualizado em 2026-08-13: Flutter Web passou a ser uma plataforma real do
+projeto, além do Android — não substitui o mobile, é um segundo target
+publicado em `vaijunto.app.br` (ver seção 2). `mobile/web/` é gerado com:
+
+```bash
+cd mobile
+flutter create --platforms=web .
+```
+
+Build local para conferir antes de depender do CI:
+
+```bash
+flutter build web --release --dart-define=API_BASE_URL=https://api.vaijunto.app.br/api/v1
+```
+
+Saída em `mobile/build/web/`. Em produção esse mesmo comando roda dentro do
+`mobile/Dockerfile` (estágio `build`, imagem `ghcr.io/cirruslabs/flutter:3.35.7`
+— mesma versão pinada da seção 1 do REQUIREMENTS.md), publicado como
+`ghcr.io/vaijunto/vaijunto-web`.
+
+Funcionalidades mobile-only (tracking em background via `geolocator`,
+push notifications via `firebase_messaging`) hoje não são importadas por
+nenhuma tela alcançável a partir de `main.dart` — não bloqueiam o build web
+por não entrarem na compilação. Se/quando forem ligadas a uma tela, cada uma
+precisa do próprio tratamento web (permissão de geolocalização do navegador
+via HTTPS, config de Firebase Web/VAPID key) — nenhum dos dois está
+configurado ainda, então mantenha essas features atrás de um fallback
+(`kIsWeb`) até existir esse config.
+
 ## 6. Pendências que exigem ação manual (fora do alcance deste repositório)
 
+- Gerar `mobile/web/` (`flutter create --platforms=web .`) e rodar
+  `flutter build web --release --dart-define=API_BASE_URL=https://api.vaijunto.app.br/api/v1`
+  localmente pelo menos uma vez antes do primeiro deploy, para pegar qualquer
+  incompatibilidade de plugin com web cedo (fora do alcance deste ambiente —
+  sem Flutter instalado aqui).
+- Customizar `mobile/web/manifest.json`, `mobile/web/index.html` e os ícones
+  gerados (nome "VaiJunto", cores do tema, ícones do PWA) depois do
+  `flutter create` acima — o scaffold gerado vem com os valores default do
+  Flutter.
+- Adicionar `CORS_ALLOWED_ORIGINS=https://vaijunto.app.br` e
+  `WEB_IMAGE=ghcr.io/vaijunto/vaijunto-web:latest` ao `.env` da VPS (seção 2.3).
+- Adicionar o serviço `web` e o bloco `vaijunto.app.br` no
+  `docker-compose.yml`/Caddyfile reais da VPS (seções 2.1/2.2).
 - ~~Aplicar a correção do script de backup (seção 4.3)~~ — **feito em
   2026-08-13**, `/usr/local/bin/backup-vaijunto-db.sh` já roda com
   `pipefail` + checagem de arquivo vazio. Primeiro backup validado sob o

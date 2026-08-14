@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:stomp_dart_client/stomp.dart';
 import 'package:stomp_dart_client/stomp_config.dart';
 import 'package:stomp_dart_client/stomp_frame.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/secure_storage.dart';
 import '../../../../core/models/location_model.dart';
 
@@ -17,8 +18,17 @@ class StompClientService {
 
   Function(LocationModel)? onLocationReceived;
 
-  // Use 10.0.2.2 para emuladores Android
-  static const String wsUrl = 'ws://10.0.2.2:8080/ws-tracking';
+  // Derivado do mesmo API_BASE_URL do ApiClient (dev: --dart-define=API_BASE_URL=
+  // http://10.0.2.2:8080/api/v1 no emulador; prod: https://api.vaijunto.app.br/api/v1),
+  // trocando o esquema http(s) -> ws(s) e o path /api/v1 -> /ws-tracking. Assim o
+  // WebSocket segue o mesmo host de produção da API REST sem precisar de outra flag.
+  static String get wsUrl {
+    final apiUri = Uri.parse(ApiClient.baseUrl);
+    final wsScheme = apiUri.scheme == 'https' ? 'wss' : 'ws';
+    return apiUri
+        .replace(scheme: wsScheme, path: '/ws-tracking')
+        .toString();
+  }
 
   StompClientService(this._secureStorage);
 
