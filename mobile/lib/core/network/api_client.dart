@@ -11,9 +11,14 @@ class ApiClient {
   late final Dio dio;
   final SecureStorage _secureStorage;
 
-  // Dispositivo físico via USB: requer `adb reverse tcp:8080 tcp:8080`.
-  // Em emulador Android, troque para http://10.0.2.2:8080/api/v1.
-  static const String baseUrl = 'http://127.0.0.1:8080/api/v1';
+  // Dev (padrão, sem flags): dispositivo físico via USB, requer
+  // `adb reverse tcp:8080 tcp:8080`. Em emulador Android, buildar com
+  // --dart-define=API_BASE_URL=http://10.0.2.2:8080/api/v1.
+  // Prod: --dart-define=API_BASE_URL=https://api.vaijunto.app.br/api/v1
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://127.0.0.1:8080/api/v1',
+  );
 
   ApiClient(this._secureStorage) {
     dio = Dio(BaseOptions(
