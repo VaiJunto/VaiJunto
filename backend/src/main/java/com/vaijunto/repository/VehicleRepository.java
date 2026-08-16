@@ -12,4 +12,5 @@ public interface VehicleRepository extends JpaRepository<Vehicle, UUID> {
     List<Vehicle> findByDriverId(UUID driverId);
     List<Vehicle> findByDriverIdAndArchivedAtIsNullOrderByIsDefaultDescCreatedAtDesc(UUID driverId);
     boolean existsByLicensePlateAndArchivedAtIsNull(String licensePlate);
+    List<Vehicle> findTop50ByLicensePlateContainingIgnoreCaseOrModelContainingIgnoreCaseOrMakeContainingIgnoreCase(String plate, String model, String make);
 }

@@ -28,6 +28,12 @@ public class Notification {
     @Column(nullable = false)
     private String type;
 
+    @Column(length = 160)
+    private String title;
+
+    @Column(columnDefinition = "text")
+    private String body;
+
     @Column(columnDefinition = "jsonb")
     private String payload;
 

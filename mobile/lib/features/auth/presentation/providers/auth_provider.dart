@@ -13,7 +13,8 @@ class DeviceVerificationRequired implements Exception {
   final String challengeToken;
 }
 
-final authStateProvider = StateNotifierProvider<AuthNotifier, AsyncValue<UserModel?>>((ref) {
+final authStateProvider =
+    StateNotifierProvider<AuthNotifier, AsyncValue<UserModel?>>((ref) {
   return AuthNotifier(ref.watch(authRepositoryProvider));
 });
 

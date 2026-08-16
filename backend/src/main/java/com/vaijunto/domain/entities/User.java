@@ -41,6 +41,25 @@ public class User {
     @Builder.Default
     private Boolean verificationBadgeActive = false;
 
+    @Column(name = "verification_status", nullable = false)
+    @Builder.Default
+    private String verificationStatus = "NOT_VERIFIED";
+
+    @Column(name = "verification_note")
+    private String verificationNote;
+
+    @Column(name = "warned_at")
+    private OffsetDateTime warnedAt;
+
+    @Column(name = "warning_reason")
+    private String warningReason;
+
+    @Column(name = "suspended_at")
+    private OffsetDateTime suspendedAt;
+
+    @Column(name = "suspension_reason")
+    private String suspensionReason;
+
     @Column(name = "deletion_requested_at")
     private OffsetDateTime deletionRequestedAt;
 
@@ -83,6 +102,14 @@ public class User {
     @Column(name = "email_verified", nullable = false)
     @Builder.Default
     private Boolean emailVerified = false;
+
+    @Column(name = "notification_hide_content", nullable = false)
+    @Builder.Default
+    private Boolean notificationHideContent = false;
+
+    @Column(name = "notification_mute_chat", nullable = false)
+    @Builder.Default
+    private Boolean notificationMuteChat = false;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

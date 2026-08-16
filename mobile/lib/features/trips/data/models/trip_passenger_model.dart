@@ -7,6 +7,8 @@ class TripPassengerModel {
   final String passengerName;
   final String status;
   final DateTime? checkedInAt;
+  final String? demandId;
+  final String? cancellationReason;
 
   TripPassengerModel({
     required this.id,
@@ -15,6 +17,8 @@ class TripPassengerModel {
     required this.passengerName,
     required this.status,
     this.checkedInAt,
+    this.demandId,
+    this.cancellationReason,
   });
 
   factory TripPassengerModel.fromJson(Map<String, dynamic> json) {
@@ -27,6 +31,8 @@ class TripPassengerModel {
       checkedInAt: json['checkedInAt'] != null
           ? parseApiDateTime(json['checkedInAt'])
           : null,
+      demandId: json['demandId'] as String?,
+      cancellationReason: json['cancellationReason'] as String?,
     );
   }
 }

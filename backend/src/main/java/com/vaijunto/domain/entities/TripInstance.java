@@ -43,6 +43,15 @@ public class TripInstance {
     @Column(name = "actual_end")
     private OffsetDateTime actualEnd;
 
+    @Column(name = "finish_reason")
+    private String finishReason;
+
+    @Column(name = "finish_note", length = 500)
+    private String finishNote;
+
+    @Column(name = "final_radius_since")
+    private OffsetDateTime finalRadiusSince;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default

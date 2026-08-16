@@ -1,0 +1,2 @@
+ALTER TABLE users ADD COLUMN notification_hide_content BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN notification_mute_chat BOOLEAN NOT NULL DEFAULT FALSE;

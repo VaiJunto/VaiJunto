@@ -34,8 +34,9 @@ class LocationTrackerService {
 
     _stompService.connect(tripId);
 
-    _positionStreamSubscription = Geolocator.getPositionStream(locationSettings: locationSettings)
-        .listen((Position position) {
+    _positionStreamSubscription =
+        Geolocator.getPositionStream(locationSettings: locationSettings)
+            .listen((Position position) {
       _stompService.sendLocationUpdate(
         tripId,
         position.latitude,

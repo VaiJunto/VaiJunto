@@ -10,6 +10,7 @@ import '../../../auth/data/models/user_model.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../vehicles/presentation/screens/vehicles_screen.dart';
 import '../../../addresses/presentation/screens/addresses_screen.dart';
+import 'blocked_users_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key, required this.user});
@@ -97,6 +98,14 @@ class SettingsScreen extends ConsumerWidget {
                     subtitle: 'Casa, trabalho e locais recentes',
                     onTap: () => Navigator.of(context).push(MaterialPageRoute(
                         builder: (_) => const AddressesScreen())),
+                  ),
+                  const _HudDivider(),
+                  _SettingRow(
+                    icon: Icons.block_rounded,
+                    title: 'Bloqueados',
+                    subtitle: 'Gerencie pessoas bloqueadas',
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => const BlockedUsersScreen())),
                   ),
                   const _HudDivider(),
                   const _SettingRow(

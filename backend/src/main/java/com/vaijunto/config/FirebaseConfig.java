@@ -8,16 +8,23 @@ import org.springframework.context.annotation.Configuration;
 
 import jakarta.annotation.PostConstruct;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import org.springframework.beans.factory.annotation.Value;
 
 @Slf4j
 @Configuration
 public class FirebaseConfig {
+    @Value("${app.firebase.service-account-path:}")
+    private String serviceAccountPath;
 
     @PostConstruct
     public void initialize() {
         try {
             // No MVP, se o arquivo não existir, não falhamos a inicialização, apenas logamos.
-            InputStream serviceAccount = getClass().getClassLoader().getResourceAsStream("firebase-service-account.json");
+            InputStream serviceAccount = serviceAccountPath != null && !serviceAccountPath.isBlank()
+                    ? Files.newInputStream(Path.of(serviceAccountPath))
+                    : getClass().getClassLoader().getResourceAsStream("firebase-service-account.json");
             
             if (serviceAccount != null && FirebaseApp.getApps().isEmpty()) {
                 FirebaseOptions options = FirebaseOptions.builder()

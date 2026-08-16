@@ -36,6 +36,11 @@ class SecureStorage {
     return await _storage.read(key: _userIdKey);
   }
 
+  Future<void> writePrivate(String key, String value) =>
+      _storage.write(key: key, value: value);
+
+  Future<String?> readPrivate(String key) => _storage.read(key: key);
+
   /// Limpa a sessão (token/userId) no logout, mas preserva o [deviceId] —
   /// ele identifica o aparelho, não a sessão. Se ele fosse apagado aqui, todo
   /// logout/login de novo pareceria "primeiro acesso" e pediria o código de

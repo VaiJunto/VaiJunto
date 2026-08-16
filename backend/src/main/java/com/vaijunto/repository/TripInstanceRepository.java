@@ -10,4 +10,5 @@ import java.util.UUID;
 @Repository
 public interface TripInstanceRepository extends JpaRepository<TripInstance, UUID> {
     List<TripInstance> findByDriverId(UUID driverId);
+    List<TripInstance> findByStatusAndScheduledDepartureBefore(com.vaijunto.domain.enums.TripStatus status, java.time.OffsetDateTime departure);
 }

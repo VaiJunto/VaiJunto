@@ -17,5 +17,8 @@ public class TripInstanceDto {
     private UUID routeId;
     private UUID driverId;
     private OffsetDateTime scheduledDeparture;
+    private OffsetDateTime actualStart;
+    private OffsetDateTime actualEnd;
+    private String finishReason;
     private TripStatus status;
 }

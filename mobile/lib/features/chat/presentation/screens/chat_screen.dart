@@ -5,6 +5,7 @@ import '../../../../core/theme/neo_brutal_theme.dart';
 import '../../../../core/ui/neo_card.dart';
 
 import '../providers/conversation_provider.dart';
+import 'conversation_screen.dart';
 
 class ChatScreen extends ConsumerWidget {
   const ChatScreen({super.key});
@@ -115,37 +116,44 @@ class ChatScreen extends ConsumerWidget {
                   separatorBuilder: (_, __) => const SizedBox(height: 10),
                   itemBuilder: (context, index) {
                     final item = items[index];
-                    return NeoCard(
-                        color: scheme.surface,
-                        padding: const EdgeInsets.all(14),
-                        offset: NeoBrutal.shadowOffsetSmall,
-                        child: Row(children: [
-                          Container(
-                              width: 42,
-                              height: 42,
-                              color: scheme.secondary,
-                              alignment: Alignment.center,
-                              child: Icon(
-                                  item.type == 'ADMINISTRATIVE'
-                                      ? Icons.support_agent_rounded
-                                      : Icons.forum_rounded,
-                                  color: Colors.white)),
-                          const SizedBox(width: 12),
-                          Expanded(
-                              child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                Text(item.title.toUpperCase(),
-                                    style: theme.textTheme.titleSmall),
-                                const SizedBox(height: 3),
-                                Text(
-                                    item.readOnly
-                                        ? 'ARQUIVADA • SOMENTE LEITURA'
-                                        : item.type,
-                                    style: _hudStyle(scheme))
-                              ])),
-                          if (item.archived) const Icon(Icons.archive_outlined)
-                        ]));
+                    return InkWell(
+                        onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                                builder: (_) =>
+                                    ConversationScreen(conversation: item))),
+                        child: NeoCard(
+                            color: scheme.surface,
+                            padding: const EdgeInsets.all(14),
+                            offset: NeoBrutal.shadowOffsetSmall,
+                            child: Row(children: [
+                              Container(
+                                  width: 42,
+                                  height: 42,
+                                  color: scheme.secondary,
+                                  alignment: Alignment.center,
+                                  child: Icon(
+                                      item.type == 'ADMINISTRATIVE'
+                                          ? Icons.support_agent_rounded
+                                          : Icons.forum_rounded,
+                                      color: Colors.white)),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                  child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                    Text(item.title.toUpperCase(),
+                                        style: theme.textTheme.titleSmall),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                        item.readOnly
+                                            ? 'ARQUIVADA • SOMENTE LEITURA'
+                                            : item.type,
+                                        style: _hudStyle(scheme))
+                                  ])),
+                              if (item.archived)
+                                const Icon(Icons.archive_outlined)
+                            ])));
                   }),
           loading: () => const Center(child: Text('CARREGANDO CONVERSAS...')),
           error: (_, __) => const Center(

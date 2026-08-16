@@ -1,0 +1,4 @@
+package com.vaijunto.domain.entities;
+import jakarta.persistence.*; import lombok.*; import org.hibernate.annotations.CreationTimestamp; import java.time.OffsetDateTime; import java.util.UUID;
+@Entity @Table(name="ride_reviews", uniqueConstraints=@UniqueConstraint(columnNames={"trip_id","reviewer_id","reviewee_id"})) @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+public class RideReview { @Id @GeneratedValue(strategy=GenerationType.UUID) private UUID id; @ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="trip_id",nullable=false) private TripInstance trip; @ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="reviewer_id",nullable=false) private User reviewer; @ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="reviewee_id",nullable=false) private User reviewee; @Column(nullable=false) private Integer rating; @CreationTimestamp @Column(name="created_at",nullable=false,updatable=false) private OffsetDateTime createdAt; }

@@ -85,14 +85,21 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
 
-    await tester.tap(find.text('CRIAR').last);
+    await tester.tap(find.byType(FloatingActionButton));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('OFERECER CARONA').last);
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     expect(find.text('CONTINUAR'), findsOneWidget);
     expect(tester.getBottomRight(find.text('CONTINUAR')).dy, lessThan(760));
 
-    for (final tab in ['CHAT', 'AJUSTES', 'CARONAS']) {
-      await tester.tap(find.text(tab).last);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    for (final tab in ['Chat', 'Ajustes', 'Caronas']) {
+      await tester.tap(find.descendant(
+          of: find.byType(NeoBottomNavBar),
+          matching: find.text(tab.toUpperCase())));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     }

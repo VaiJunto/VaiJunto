@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:stomp_dart_client/stomp.dart';
 import 'package:stomp_dart_client/stomp_config.dart';
@@ -15,8 +16,12 @@ final stompClientProvider = Provider<StompClientService>((ref) {
 class StompClientService {
   final SecureStorage _secureStorage;
   StompClient? _stompClient;
+  final Set<String> _chatSubscriptions = <String>{};
 
   Function(LocationModel)? onLocationReceived;
+  Function(String conversationId, bool typing)? onTypingReceived;
+  Function(String conversationId, double latitude, double longitude)?
+      onLiveLocationReceived;
 
   // Derivado do mesmo API_BASE_URL do ApiClient (dev: --dart-define=API_BASE_URL=
   // http://10.0.2.2:8080/api/v1 no emulador; prod: https://api.vaijunto.app.br/api/v1),
@@ -25,9 +30,7 @@ class StompClientService {
   static String get wsUrl {
     final apiUri = Uri.parse(ApiClient.baseUrl);
     final wsScheme = apiUri.scheme == 'https' ? 'wss' : 'ws';
-    return apiUri
-        .replace(scheme: wsScheme, path: '/ws-tracking')
-        .toString();
+    return apiUri.replace(scheme: wsScheme, path: '/ws-tracking').toString();
   }
 
   StompClientService(this._secureStorage);
@@ -44,11 +47,79 @@ class StompClientService {
         onConnect: (StompFrame frame) {
           _subscribeToTrip(tripId);
         },
-        onWebSocketError: (dynamic error) => print(error.toString()),
+        onWebSocketError: (dynamic error) => developer.log(
+          'WebSocket connection failed.',
+          error: error,
+          name: 'StompClientService',
+        ),
       ),
     );
 
     _stompClient?.activate();
+  }
+
+  Future<void> connectChat(String conversationId) async {
+    final token = await _secureStorage.getToken();
+    if (token == null) return;
+    _stompClient ??= StompClient(
+        config: StompConfig.sockJS(
+            url: wsUrl,
+            stompConnectHeaders: {'Authorization': 'Bearer $token'},
+            webSocketConnectHeaders: {'Authorization': 'Bearer $token'},
+            onConnect: (_) => _subscribeToChat(conversationId),
+            onWebSocketError: (_) {}));
+    if (_stompClient!.isActive) {
+      _subscribeToChat(conversationId);
+    } else {
+      _stompClient!.activate();
+    }
+  }
+
+  void _subscribeToChat(String conversationId) {
+    if (!_chatSubscriptions.add(conversationId)) return;
+    _stompClient?.subscribe(
+        destination: '/user/queue/chat/typing',
+        callback: (frame) {
+          if (frame.body == null) return;
+          final value = json.decode(frame.body!);
+          if (onTypingReceived != null) {
+            onTypingReceived!(
+                value['conversationId'] as String, value['typing'] as bool);
+          }
+        });
+    _stompClient?.subscribe(
+        destination: '/user/queue/chat/location',
+        callback: (frame) {
+          if (frame.body == null) return;
+          final value = json.decode(frame.body!) as Map<String, dynamic>;
+          onLiveLocationReceived?.call(
+              value['conversationId'] as String,
+              (value['latitude'] as num).toDouble(),
+              (value['longitude'] as num).toDouble());
+        });
+  }
+
+  void sendTyping(String conversationId, bool typing) {
+    if (_stompClient?.isActive ?? false) {
+      _stompClient?.send(
+          destination: '/app/chat/typing',
+          body: json
+              .encode({'conversationId': conversationId, 'typing': typing}));
+    }
+  }
+
+  void sendLiveLocation(String conversationId, double latitude,
+      double longitude, DateTime expiresAt) {
+    if (_stompClient?.isActive ?? false) {
+      _stompClient?.send(
+          destination: '/app/chat/location',
+          body: json.encode({
+            'conversationId': conversationId,
+            'latitude': latitude,
+            'longitude': longitude,
+            'expiresAtEpochMs': expiresAt.millisecondsSinceEpoch,
+          }));
+    }
   }
 
   void _subscribeToTrip(String tripId) {

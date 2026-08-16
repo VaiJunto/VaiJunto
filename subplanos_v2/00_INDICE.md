@@ -6,9 +6,9 @@ normal. Cada tarefa deve ler somente este índice e o próximo arquivo `PENDENTE
 
 ## Estado geral
 
-Progresso dos subplanos: **38%**  
-Próximo subplano executável: **04**  
-Última atualização: **2026-08-14**
+Progresso dos subplanos: **88%**  
+Próximo subplano executável: **08**  
+Última atualização: **2026-08-16**
 
 ## Ordem por dependência
 
@@ -17,11 +17,11 @@ Próximo subplano executável: **04**
 | 01 | `01_CONCLUIDO_fundacoes_e_seguranca.md` | Nenhum subplano | 100% | Concluído |
 | 02 | `02_CONCLUIDO_cadastros_reutilizaveis.md` | 01 | 100% | Concluído |
 | 03 | `03_CONCLUIDO_publicacao_e_descoberta.md` | 01, 02 | 100% | Concluído |
-| 04 | `04_PENDENTE_chat_notificacoes_offline.md` | 01, 02, 03 | 0% | Aguardando 01–03 |
-| 05 | `05_PENDENTE_solicitacoes_e_aceites.md` | 03, 04 | 0% | Aguardando 03–04 |
-| 06 | `06_PENDENTE_ciclo_da_carona_e_bloqueios.md` | 03, 04, 05 | 0% | Aguardando 03–05 |
-| 07 | `07_PENDENTE_administracao_e_moderacao.md` | 01, 04, 05, 06 | 0% | Aguardando 01, 04–06 |
-| 08 | `08_PENDENTE_integracao_qualidade_e_entrega.md` | 01–07 | 0% | Aguardando 01–07 |
+| 04 | `04_CONCLUIDO_chat_notificacoes_offline.md` | 01, 02, 03 | 100% | Concluído |
+| 05 | `05_CONCLUIDO_solicitacoes_e_aceites.md` | 03, 04 | 100% | Concluído |
+| 06 | `06_CONCLUIDO_ciclo_da_carona_e_bloqueios.md` | 03, 04, 05 | 100% | Concluído |
+| 07 | `07_CONCLUIDO_administracao_e_moderacao.md` | 01, 04, 05, 06 | 100% | Concluído |
+| 08 | `08_PENDENTE_integracao_qualidade_e_entrega.md` | 01–07 | 0% | Executável |
 
 Fluxo principal: `01 → 02 → 03 → 04 → 05 → 06 → 07 → 08`.
 
