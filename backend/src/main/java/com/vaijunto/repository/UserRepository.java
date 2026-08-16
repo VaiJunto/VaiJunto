@@ -17,4 +17,5 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     boolean existsByEmail(String email);
     List<User> findByDeletionRequestedAtBeforeAndAnonymizedAtIsNull(OffsetDateTime before);
     List<User> findByNameChangeStatus(String status);
+    List<User> findTop50ByNameContainingIgnoreCaseOrFullNameContainingIgnoreCaseOrEmailContainingIgnoreCase(String name, String fullName, String email);
 }

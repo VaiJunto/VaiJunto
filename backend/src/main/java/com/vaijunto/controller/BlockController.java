@@ -1,0 +1,3 @@
+package com.vaijunto.controller;
+import com.vaijunto.dto.BlockUserDto; import com.vaijunto.service.BlockService; import lombok.RequiredArgsConstructor; import org.springframework.security.core.Authentication; import org.springframework.web.bind.annotation.*; import java.util.*;
+@RestController @RequestMapping("/api/v1/blocks") @RequiredArgsConstructor public class BlockController {private final BlockService service; @GetMapping public List<BlockUserDto> list(Authentication a){return service.list(a.getName());} @PostMapping("/{userId}") public void block(@PathVariable UUID userId,Authentication a){service.block(userId,a.getName());} @DeleteMapping("/{userId}") public void unblock(@PathVariable UUID userId,Authentication a){service.unblock(userId,a.getName());}}

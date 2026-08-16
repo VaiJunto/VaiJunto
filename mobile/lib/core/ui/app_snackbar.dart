@@ -54,7 +54,8 @@ class AppSnackbar {
                 Expanded(
                   child: Text(
                     message,
-                    style: TextStyle(color: ink, fontSize: 14, fontWeight: FontWeight.w700),
+                    style: TextStyle(
+                        color: ink, fontSize: 14, fontWeight: FontWeight.w700),
                   ),
                 ),
               ],
@@ -66,7 +67,8 @@ class AppSnackbar {
           margin: const EdgeInsets.all(16),
           padding: EdgeInsets.zero,
           shape: const RoundedRectangleBorder(),
-          duration: Duration(milliseconds: kind == _SnackKind.error ? 3000 : 2200),
+          duration:
+              Duration(milliseconds: kind == _SnackKind.error ? 3000 : 2200),
           dismissDirection: DismissDirection.horizontal,
         ),
       );

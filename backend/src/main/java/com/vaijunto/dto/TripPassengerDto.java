@@ -18,4 +18,6 @@ public class TripPassengerDto {
     private String passengerName;
     private PassengerStatus status;
     private OffsetDateTime checkedInAt;
+    private UUID demandId;
+    private String cancellationReason;
 }

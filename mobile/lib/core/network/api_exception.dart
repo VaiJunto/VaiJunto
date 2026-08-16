@@ -23,7 +23,8 @@ class ApiException implements Exception {
       final message = data['message'] as String;
       final code = data['code'] is String ? data['code'] as String : null;
       if (message.trim().isNotEmpty) {
-        return ApiException(message, statusCode: response?.statusCode, code: code);
+        return ApiException(message,
+            statusCode: response?.statusCode, code: code);
       }
     }
 

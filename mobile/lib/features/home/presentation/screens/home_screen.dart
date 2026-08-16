@@ -17,6 +17,8 @@ import '../../../my_rides/presentation/screens/my_rides_screen.dart';
 import '../../../offers/presentation/screens/create_offer_screen.dart';
 import '../../../offers/data/models/offer_model.dart';
 import '../../../demands/presentation/screens/create_demand_screen.dart';
+import '../../../notifications/presentation/notification_center_screen.dart';
+import '../../../notifications/data/services/notification_service.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key, required this.user});
@@ -37,6 +39,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   ];
 
   int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() => ref.read(notificationServiceProvider).init());
+  }
 
   void _openCreate(CreateRideMode mode, {OfferModel? offer}) {
     Navigator.of(context).push(MaterialPageRoute(
@@ -138,6 +146,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            tooltip: 'Notificações',
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => const NotificationCenterScreen())),
+            icon: const Icon(Icons.notifications_none_rounded),
+          ),
           Padding(
             padding: const EdgeInsets.only(right: 14),
             child: NeoAvatar(

@@ -1,14 +1,20 @@
+import 'dart:developer' as developer;
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dio/dio.dart';
+import '../../../../core/network/api_client.dart';
 
 final notificationServiceProvider = Provider<NotificationService>((ref) {
-  return NotificationService();
+  return NotificationService(ref.watch(dioProvider));
 });
 
 class NotificationService {
+  NotificationService(this._dio);
+  final Dio _dio;
   late final FirebaseMessaging _messaging;
-  
+
   Function(RemoteMessage)? onMessageReceived;
 
   Future<void> init() async {
@@ -25,8 +31,10 @@ class NotificationService {
 
       if (settings.authorizationStatus == AuthorizationStatus.authorized) {
         String? token = await _messaging.getToken();
-        print('FCM Token do Dispositivo: $token');
-        // TODO: Enviar esse token para o backend associado ao UserModel.id
+        if (token != null) {
+          await _dio
+              .post('/notifications/device-token', data: {'token': token});
+        }
 
         FirebaseMessaging.onMessage.listen((RemoteMessage message) {
           if (onMessageReceived != null) {
@@ -34,8 +42,13 @@ class NotificationService {
           }
         });
       }
-    } catch (e) {
-      print('Erro ao inicializar Firebase Messaging no ambiente local: $e');
+    } catch (error, stackTrace) {
+      developer.log(
+        'Firebase Messaging initialization failed.',
+        error: error,
+        stackTrace: stackTrace,
+        name: 'NotificationService',
+      );
     }
   }
 }

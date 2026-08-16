@@ -11,6 +11,7 @@ import '../../../demands/data/models/demand_model.dart';
 import '../../../demands/presentation/providers/demand_provider.dart';
 import '../../../offers/data/models/offer_model.dart';
 import '../../../offers/presentation/providers/offer_provider.dart';
+import '../../../trips/presentation/providers/trip_provider.dart';
 
 enum RideFeedMode { offers, demands }
 
@@ -151,16 +152,48 @@ class _RidesScreenState extends ConsumerState<RidesScreen> {
                   ? _OfferList(
                       offers: filteredOffers,
                       onCreate: widget.onCreateOffer,
+                      onRequest: _requestSeat,
                     )
                   : _DemandList(
                       demands: filteredDemands,
                       onCreate: widget.onCreateDemand,
+                      onPropose: _propose,
                     ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _requestSeat(OfferModel offer) async {
+    try {
+      await ref.read(rideActionProvider).requestSeat(offer.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('PEDIDO ENVIADO. AGUARDE A RESPOSTA DO MOTORISTA.')));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('NÃO FOI POSSÍVEL ENVIAR O PEDIDO.')));
+      }
+    }
+  }
+
+  Future<void> _propose(DemandModel demand) async {
+    try {
+      await ref.read(rideActionProvider).propose(demand.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('PROPOSTA ENVIADA. VOCÊS JÁ PODEM CONVERSAR.')));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('NÃO FOI POSSÍVEL ENVIAR A PROPOSTA.')));
+      }
+    }
   }
 
   bool _matches(
@@ -258,10 +291,12 @@ class _FeedFilters extends StatelessWidget {
 }
 
 class _OfferList extends StatelessWidget {
-  const _OfferList({required this.offers, required this.onCreate});
+  const _OfferList(
+      {required this.offers, required this.onCreate, required this.onRequest});
 
   final List<OfferModel> offers;
   final VoidCallback onCreate;
+  final Future<void> Function(OfferModel) onRequest;
 
   @override
   Widget build(BuildContext context) {
@@ -280,16 +315,19 @@ class _OfferList extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
       itemCount: offers.length,
       separatorBuilder: (_, __) => const SizedBox(height: 14),
-      itemBuilder: (context, index) => _OfferCard(offer: offers[index]),
+      itemBuilder: (context, index) =>
+          _OfferCard(offer: offers[index], onRequest: onRequest),
     );
   }
 }
 
 class _DemandList extends StatelessWidget {
-  const _DemandList({required this.demands, required this.onCreate});
+  const _DemandList(
+      {required this.demands, required this.onCreate, required this.onPropose});
 
   final List<DemandModel> demands;
   final VoidCallback onCreate;
+  final Future<void> Function(DemandModel) onPropose;
 
   @override
   Widget build(BuildContext context) {
@@ -308,15 +346,17 @@ class _DemandList extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
       itemCount: demands.length,
       separatorBuilder: (_, __) => const SizedBox(height: 14),
-      itemBuilder: (context, index) => _DemandCard(demand: demands[index]),
+      itemBuilder: (context, index) =>
+          _DemandCard(demand: demands[index], onPropose: onPropose),
     );
   }
 }
 
 class _OfferCard extends StatelessWidget {
-  const _OfferCard({required this.offer});
+  const _OfferCard({required this.offer, required this.onRequest});
 
   final OfferModel offer;
+  final Future<void> Function(OfferModel) onRequest;
 
   @override
   Widget build(BuildContext context) {
@@ -335,6 +375,8 @@ class _OfferCard extends StatelessWidget {
         extra: offer.price == 0
             ? '${offer.availableSeats} VAGAS • GRÁTIS'
             : '${offer.availableSeats} VAGAS • R\$ ${offer.price.toStringAsFixed(2).replaceAll('.', ',')}',
+        actionLabel: 'SOLICITAR VAGA',
+        onAction: () => onRequest(offer),
       ),
       child: NeoCard(
         color: scheme.surface,
@@ -390,9 +432,10 @@ class _OfferCard extends StatelessWidget {
 }
 
 class _DemandCard extends StatelessWidget {
-  const _DemandCard({required this.demand});
+  const _DemandCard({required this.demand, required this.onPropose});
 
   final DemandModel demand;
+  final Future<void> Function(DemandModel) onPropose;
 
   @override
   Widget build(BuildContext context) {
@@ -409,6 +452,8 @@ class _DemandCard extends StatelessWidget {
         destination: demand.destinationName,
         schedule: _dateLabel(demand.desiredTime),
         extra: 'AGUARDANDO MOTORISTA',
+        actionLabel: 'ENVIAR PROPOSTA',
+        onAction: () => onPropose(demand),
       ),
       child: NeoCard(
         color: scheme.surface,
@@ -739,6 +784,8 @@ void _showRideDetails(
   required String destination,
   required String schedule,
   required String extra,
+  required String actionLabel,
+  required Future<void> Function() onAction,
 }) {
   final theme = Theme.of(context);
   final scheme = theme.colorScheme;
@@ -791,6 +838,14 @@ void _showRideDetails(
                   'O contato direto estará disponível quando o chat for liberado.',
                   style: theme.textTheme.bodySmall
                       ?.copyWith(color: scheme.onSurfaceVariant),
+                ),
+                const SizedBox(height: 14),
+                NeoButton(
+                  onPressed: () async {
+                    Navigator.of(sheetContext).pop();
+                    await onAction();
+                  },
+                  child: Text(actionLabel),
                 ),
               ],
             ),

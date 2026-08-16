@@ -13,6 +13,8 @@ import java.util.UUID;
 public class NotificationDto {
     private UUID id;
     private String type;
+    private String title;
+    private String body;
     private String payload;
     private Boolean isRead;
     private OffsetDateTime createdAt;

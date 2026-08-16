@@ -57,4 +57,7 @@ public class ApiException extends RuntimeException {
     public static ApiException userNotFound() {
         return new ApiException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "Usuário não encontrado.");
     }
+    public static ApiException conversationForbidden() {
+        return new ApiException(HttpStatus.FORBIDDEN, "CONVERSATION_FORBIDDEN", "Você não tem acesso a esta conversa.");
+    }
 }

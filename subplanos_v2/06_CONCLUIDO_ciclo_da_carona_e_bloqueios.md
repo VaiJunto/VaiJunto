@@ -1,7 +1,7 @@
 # Subplano 06 — Ciclo da carona e bloqueios
 
-Progresso do subplano: **0%**  
-Estado: **Aguardando subplanos 03–05**  
+Progresso do subplano: **100%**  
+Estado: **Concluído**  
 Depende de: **03, 04 e 05 concluídos**
 
 ## Instrução de contexto
@@ -91,6 +91,14 @@ ausência, avaliação privada e bloqueio consistente.
 - Logs de cancelamento, ausência e finalização são auditáveis.
 - Bloqueio é aplicado no backend e testado em todas as consultas e WebSockets.
 - Testes backend/Flutter e versão conforme `CLAUDE.md` estão concluídos.
+
+## Evidências de conclusão
+
+- Backend: edição e cancelamento de oferta, máquina de estados da carona,
+  ausência/contestação, finalização, avaliações privadas e bloqueio recíproco.
+- Persistência: migração `V14__ride_lifecycle_reviews_and_blocks.sql`.
+- App: cliente de ações de carona e gestão em `AJUSTES > BLOQUEADOS`.
+- Verificação: `mvn test -q` e `flutter test` concluídos com sucesso.
 
 ## Ao chegar a 100%
 

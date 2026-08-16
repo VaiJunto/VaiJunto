@@ -14,5 +14,6 @@ public class AdminAuditEvent {
     @Column(name = "event_type", nullable = false) private String eventType;
     @Column(name = "target_type") private String targetType;
     @Column(name = "target_id") private String targetId;
+    @Column(columnDefinition = "text") private String reason;
     @CreationTimestamp @Column(name = "created_at", updatable = false) private OffsetDateTime createdAt;
 }

@@ -40,6 +40,24 @@ public class TripPassenger {
     @Column(name = "checked_in_at")
     private OffsetDateTime checkedInAt;
 
+    /** A proposta nasce de um pedido publicado; pedidos de vaga deixam este campo nulo. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "demand_id")
+    private Demand demand;
+
+    @Column(name = "cancellation_reason")
+    private String cancellationReason;
+
+    /** Texto privado: nunca é serializado para o outro participante. */
+    @Column(name = "cancellation_note", length = 500)
+    private String cancellationNote;
+
+    @Column(name = "absence_contested_at")
+    private OffsetDateTime absenceContestedAt;
+
+    @Column(name = "absence_contestation", length = 500)
+    private String absenceContestation;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;

@@ -1,7 +1,7 @@
 # Subplano 07 — Administração e moderação
 
-Progresso do subplano: **0%**  
-Estado: **Aguardando subplanos 01 e 04–06**  
+Progresso do subplano: **100%**  
+Estado: **Concluído**  
 Depende de: **01, 04, 05 e 06 concluídos**
 
 ## Instrução de contexto
@@ -18,10 +18,10 @@ moderação e contato administrativo sem violar a privacidade dos chats.
 
 | Item | Entrega | Progresso | Estado | Evidência |
 |---|---|---:|---|---|
-| US-ADM-03 | Selo de verificação | 0% | Aguardando auth admin/perfil | — |
-| US-ADM-04 | Operação e moderação | 0% | Aguardando eventos completos | — |
-| US-ADM-05 | Conversa administrativa | 0% | Aguardando chat/admin | — |
-| ADMIN-QA | Auditoria, autorização e privacidade | 0% | Aguardando histórias admin | — |
+| US-ADM-03 | Selo de verificação | 100% | Concessão, pausa, recusa e remoção motivadas, auditadas e notificadas | `AdminOperationsService.verify`, V15, testes unitários |
+| US-ADM-04 | Operação e moderação | 100% | Busca de pessoas/veículos/caronas, denúncias, mídia de evidência e figurinhas auditadas | `AdminManagementController`, V15 |
+| US-ADM-05 | Conversa administrativa | 100% | Conversa isolada, identificada e permanente, sem acesso a chats privados | V16, `AdminOperationsService.contact` |
+| ADMIN-QA | Auditoria, autorização e privacidade | 100% | Migrações, testes backend e testes/análise Flutter concluídos | `mvn test -q`; `flutter analyze`; `flutter test` |
 
 ## US-ADM-03 — Selo de verificação
 
@@ -53,6 +53,12 @@ moderação e contato administrativo sem violar a privacidade dos chats.
 - Admin vê somente mensagens explicitamente selecionadas pelo denunciante.
 - Cópia é imutável mesmo se original for editado/apagado.
 - Todo acesso à denúncia é auditado.
+- Mídias vinculadas a denúncia não entram em limpeza automática. Somente um
+  administrador autorizado pode excluí-las manualmente no painel, após
+  confirmação explícita que informe a consequência para a evidência; a ação,
+  motivo, administrador, arquivo e resultado são auditados. A exclusão mantém
+  a referência histórica da denúncia como `MÍDIA REMOVIDA PELO ADMIN`, sem URL
+  ou objeto órfão no R2.
 - Estados: `ENVIADA`, `EM ANÁLISE`, `RESOLVIDA`; usuário recebe resumo sem medida
   privada tomada sobre terceiro.
 - Admin não entra silenciosamente nem lê o restante de chat criptografado.

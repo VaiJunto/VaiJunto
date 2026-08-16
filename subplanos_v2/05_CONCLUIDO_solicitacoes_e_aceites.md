@@ -1,7 +1,7 @@
 # Subplano 05 — Solicitações, propostas e aceites
 
-Progresso do subplano: **0%**  
-Estado: **Aguardando subplanos 03 e 04**  
+Progresso do subplano: **100%**  
+Estado: **Concluído**  
 Depende de: **03 e 04 concluídos**
 
 ## Instrução de contexto
@@ -18,11 +18,18 @@ responde a pedido publicado, com concorrência segura e mensagens claras.
 
 | Item | Entrega | Progresso | Estado | Evidência |
 |---|---|---:|---|---|
-| US-SOL-01 | Passageiro solicita vaga | 0% | Aguardando oferta/chat | — |
-| US-SOL-02 | Motorista aceita passageiro | 0% | Aguardando US-SOL-01 | — |
-| US-SOL-03 | Motorista recusa solicitação | 0% | Aguardando US-SOL-01 | — |
-| US-SOL-04 | Motorista propõe em pedido | 0% | Aguardando pedido/chat | — |
-| US-SOL-05 | Passageiro cancela participação | 0% | Aguardando aceite | — |
+| US-SOL-01 | Passageiro solicita vaga | 100% | Concluído | `POST /trips/offers/{id}/requests`, sessão, conversa e notificação |
+| US-SOL-02 | Motorista aceita passageiro | 100% | Concluído | lock pessimista da oferta, conflito de agenda, lotação e fechamento automático |
+| US-SOL-03 | Motorista recusa solicitação | 100% | Concluído | transição idempotente `DECLINED` autorizada |
+| US-SOL-04 | Motorista propõe em pedido | 100% | Concluído | proposta, conversa, aceite, retirada e expiração de concorrentes |
+| US-SOL-05 | Passageiro cancela participação | 100% | Concluído | motivos privados, reabertura de vaga e fila de revisão humana |
+
+## Evidências de validação
+
+- `backend`: `rtk mvn test -q` — passou em 2026-08-16.
+- `mobile`: `rtk flutter test` — 8 testes passaram em 2026-08-16.
+- `mobile`: `rtk flutter analyze` — sem erros; permanecem apenas avisos informativos preexistentes fora deste subplano.
+- Migração Flyway `V13__ride_requests_proposals_and_cancellations.sql` adiciona estados, privacidade de cancelamento e fila de revisão manual, sem punição automática.
 
 ## US-SOL-01 — Solicitar vaga
 

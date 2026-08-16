@@ -3,6 +3,7 @@ package com.vaijunto.repository;
 import com.vaijunto.domain.entities.Offer;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
@@ -14,6 +15,10 @@ import org.springframework.data.domain.Pageable;
 
 @Repository
 public interface OfferRepository extends JpaRepository<Offer, UUID> {
+    List<Offer> findTop50ByOrderByDepartureAtDesc();
+    @Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select o from Offer o where o.id = :id")
+    java.util.Optional<Offer> findByIdForUpdate(@Param("id") UUID id);
     List<Offer> findByDriverIdOrderByDepartureAtAsc(UUID driverId);
     long countByDriverIdAndStatusIn(UUID driverId, java.util.Collection<com.vaijunto.domain.enums.OfferStatus> statuses);
     @Query(value = "SELECT EXISTS(SELECT 1 FROM offers WHERE driver_id = :driverId AND status IN ('ACTIVE','FULL') AND departure_at BETWEEN :from AND :to)", nativeQuery = true)

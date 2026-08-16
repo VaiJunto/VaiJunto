@@ -51,7 +51,9 @@ class _CreateOfferScreenState extends ConsumerState<CreateOfferScreen> {
     final offer = widget.initialOffer;
     if (offer == null ||
         offer.originLocation == null ||
-        offer.destinationLocation == null) return;
+        offer.destinationLocation == null) {
+      return;
+    }
     final toFatec = offer.destinationName.toUpperCase().contains('FATEC');
     _direction = toFatec ? TripDirection.toFatec : TripDirection.fromFatec;
     final point = toFatec ? offer.originLocation! : offer.destinationLocation!;
@@ -150,8 +152,9 @@ class _CreateOfferScreenState extends ConsumerState<CreateOfferScreen> {
   String? _seatsValidator(String? value) {
     final seats = int.tryParse(value?.trim() ?? '');
     if (seats == null || seats < 1) return 'Mínimo: 1';
-    if (_vehicle != null && seats > _vehicle!.capacity)
+    if (_vehicle != null && seats > _vehicle!.capacity) {
       return 'Máximo: ${_vehicle!.capacity} vagas';
+    }
     return null;
   }
 
@@ -166,14 +169,16 @@ class _CreateOfferScreenState extends ConsumerState<CreateOfferScreen> {
     final createState = ref.watch(createOfferProvider);
     final vehicles = ref.watch(vehiclesProvider);
     vehicles.whenData((list) {
-      if (_vehicle == null && list.isNotEmpty)
+      if (_vehicle == null && list.isNotEmpty) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted)
+          if (mounted) {
             setState(() => _vehicle = list.firstWhere(
                 (v) => v.id == widget.initialOffer?.vehicleId,
                 orElse: () => list.firstWhere((v) => v.isDefault,
                     orElse: () => list.first)));
+          }
         });
+      }
     });
 
     ref.listen(createOfferProvider, (previous, next) {
@@ -221,8 +226,9 @@ class _CreateOfferScreenState extends ConsumerState<CreateOfferScreen> {
               onVehicleChanged: (value) => setState(() {
                 _vehicle = value;
                 if (int.tryParse(_seatsController.text) != null &&
-                    int.parse(_seatsController.text) > value.capacity)
+                    int.parse(_seatsController.text) > value.capacity) {
                   _seatsController.text = value.capacity.toString();
+                }
               }),
             ),
     );
@@ -368,7 +374,7 @@ class _OfferDetailsStep extends StatelessWidget {
                 origin: origin, destination: destination, onEdit: onEditRoute),
             const SizedBox(height: 14),
             DropdownButtonFormField<VehicleModel>(
-              value: vehicle,
+              initialValue: vehicle,
               isExpanded: true,
               decoration: const InputDecoration(labelText: 'Veículo'),
               hint: const Text('Cadastre um veículo para continuar'),

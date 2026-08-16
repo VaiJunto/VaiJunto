@@ -14,6 +14,7 @@ public class Conversation {
  @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "ride_id") private TripInstance ride;
  @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "participant_a_id") private User participantA;
  @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "participant_b_id") private User participantB;
+ @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "admin_account_id") private AdminAccount adminAccount;
  @Column(name = "archived_at") private OffsetDateTime archivedAt;
  @Column(name = "read_only_at") private OffsetDateTime readOnlyAt;
  @Column(name = "last_activity_at", nullable = false) private OffsetDateTime lastActivityAt;

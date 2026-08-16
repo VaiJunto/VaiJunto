@@ -7,10 +7,15 @@ import com.vaijunto.domain.entities.Vehicle;
 import com.vaijunto.dto.CreateOfferRequest;
 import com.vaijunto.dto.LocationDto;
 import com.vaijunto.dto.OfferDto;
+import com.vaijunto.dto.UpdateOfferRequest;
+import com.vaijunto.dto.CancelOfferRequest;
+import com.vaijunto.domain.enums.*;
 import com.vaijunto.repository.OfferRepository;
 import com.vaijunto.repository.RouteRepository;
 import com.vaijunto.repository.UserRepository;
 import com.vaijunto.repository.VehicleRepository;
+import com.vaijunto.repository.TripPassengerRepository;
+import com.vaijunto.repository.TripInstanceRepository;
 import lombok.RequiredArgsConstructor;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
@@ -32,17 +37,22 @@ public class OfferService {
     private final RouteRepository routeRepository;
     private final UserRepository userRepository;
     private final VehicleRepository vehicleRepository;
+    private final TripPassengerRepository passengers;
+    private final TripInstanceRepository trips;
+    private final NotificationService notifications;
+    private final BlockService blocks;
 
     private final GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
 
     @Transactional(readOnly = true)
-    public List<OfferDto> findActiveOffersNearOrigin(double lat, double lon, double distanceMeters) {
+    public List<OfferDto> findActiveOffersNearOrigin(double lat, double lon, double distanceMeters, String email) {
+        User viewer = userRepository.findByEmail(email).orElseThrow();
         List<Offer> offers = offerRepository.findActiveOffersNearOrigin(
                 lon, lat, distanceMeters, OffsetDateTime.now()
         );
 
         return offers.stream()
-                .map(this::mapToDto)
+                .filter(o -> !blocks.blocked(viewer.getId(), o.getDriver().getId())).map(this::mapToDto)
                 .collect(Collectors.toList());
     }
 
@@ -108,11 +118,31 @@ public class OfferService {
     }
 
     @Transactional(readOnly = true)
-    public com.vaijunto.dto.PageResponse<OfferDto> browse(int page, int size) {
+    public com.vaijunto.dto.PageResponse<OfferDto> browse(int page, int size, String email) {
+        User viewer = userRepository.findByEmail(email).orElseThrow();
         int safeSize = Math.min(Math.max(size, 1), 50);
         var result = offerRepository.findByStatusInAndDepartureAtAfterOrderByDepartureAtAsc(List.of(com.vaijunto.domain.enums.OfferStatus.ACTIVE, com.vaijunto.domain.enums.OfferStatus.FULL), OffsetDateTime.now(), org.springframework.data.domain.PageRequest.of(Math.max(page, 0), safeSize));
-        return com.vaijunto.dto.PageResponse.from(result.map(this::mapToDto));
+        var visible = result.stream().filter(o -> !blocks.blocked(viewer.getId(), o.getDriver().getId())).toList();
+        return new com.vaijunto.dto.PageResponse<>(visible.stream().map(this::mapToDto).toList(), result.getNumber(), result.getSize(), visible.size(), result.getTotalPages(), result.hasNext());
     }
+
+    @Transactional public OfferDto update(java.util.UUID id, UpdateOfferRequest request, String email) {
+        Offer offer = offerRepository.findByIdForUpdate(id).orElseThrow(() -> new IllegalArgumentException("Oferta não encontrada."));
+        if (!offer.getDriver().getEmail().equals(email)) throw new org.springframework.security.access.AccessDeniedException("Oferta de outro motorista.");
+        OffsetDateTime now=OffsetDateTime.now(); if (!offer.getDepartureAt().isAfter(now.plusHours(1))) throw new IllegalStateException("Na última hora, cancele a oferta com um motivo.");
+        boolean reconfirm = (request.getDepartureAt()!=null && !request.getDepartureAt().equals(offer.getDepartureAt())) || request.getVehicleId()!=null || (request.getPrice()!=null && request.getPrice().compareTo(offer.getPrice())>0) || request.getOriginName()!=null || request.getDestinationName()!=null;
+        if (reconfirm && !offer.getDepartureAt().isAfter(now.plusHours(3))) throw new IllegalStateException("Mudanças que exigem reconfirmação fecham 3 horas antes.");
+        int accepted=(int)passengers.findByTripInstanceId(tripFor(offer).getId()).stream().filter(p->p.getStatus()==PassengerStatus.CONFIRMED||p.getStatus()==PassengerStatus.CHECKED_IN).count();
+        if(request.getAvailableSeats()!=null){if(request.getAvailableSeats()<accepted)throw new IllegalArgumentException("Não reduza vagas abaixo das pessoas aceitas.");offer.setAvailableSeats(request.getAvailableSeats()-accepted);}
+        if(request.getDepartureAt()!=null)offer.setDepartureAt(request.getDepartureAt()); if(request.getPrice()!=null)offer.setPrice(request.getPrice());
+        if(request.getVehicleId()!=null){Vehicle vehicle=vehicleRepository.findById(request.getVehicleId()).orElseThrow(()->new IllegalArgumentException("Veículo não encontrado."));if(!vehicle.getDriver().getId().equals(offer.getDriver().getId()))throw new IllegalArgumentException("Veículo inválido.");offer.getRoute().setVehicle(vehicle);}
+        if(request.getOriginName()!=null)offer.getRoute().setOriginName(request.getOriginName());if(request.getDestinationName()!=null)offer.getRoute().setDestinationName(request.getDestinationName());
+        if(reconfirm)passengers.findByTripInstanceId(tripFor(offer).getId()).stream().filter(p->p.getStatus()==PassengerStatus.CONFIRMED).forEach(p->{p.setStatus(PassengerStatus.REQUESTED);notifications.createAndSendNotification(p.getPassenger().getId(),"Mudança na carona","Confirme novamente sua participação até uma hora antes.","RIDE_RECONFIRM",json(tripFor(offer).getId()),null);});
+        return mapToDto(offer);
+    }
+    @Transactional public void cancel(java.util.UUID id, CancelOfferRequest request, String email) { Offer offer=offerRepository.findByIdForUpdate(id).orElseThrow(()->new IllegalArgumentException("Oferta não encontrada."));if(!offer.getDriver().getEmail().equals(email))throw new org.springframework.security.access.AccessDeniedException("Oferta de outro motorista."); if(!java.util.Set.of("IMPREVISTO_PESSOAL","VEICULO","SAUDE_EMERGENCIA","COMPROMISSO","SEGURANCA","OUTRO").contains(request.reason()))throw new IllegalArgumentException("Motivo inválido.");if("OUTRO".equals(request.reason())&&(request.note()==null||request.note().isBlank()))throw new IllegalArgumentException("Explique o motivo OUTRO.");offer.setStatus(OfferStatus.CANCELLED);var trip=tripFor(offer);trip.setStatus(TripStatus.CANCELLED);passengers.findByTripInstanceId(trip.getId()).forEach(p->{if(p.getStatus()==PassengerStatus.CONFIRMED||p.getStatus()==PassengerStatus.REQUESTED){p.setStatus(PassengerStatus.CANCELLED);notifications.createAndSendNotification(p.getPassenger().getId(),"Carona cancelada","O motorista cancelou: "+request.reason(),"RIDE_OFFER_CANCELLED",json(trip.getId()),null);}}); }
+    private com.vaijunto.domain.entities.TripInstance tripFor(Offer offer){return trips.findByDriverId(offer.getDriver().getId()).stream().filter(t->t.getOffer()!=null&&t.getOffer().getId().equals(offer.getId())).findFirst().orElseGet(()->trips.save(com.vaijunto.domain.entities.TripInstance.builder().offer(offer).route(offer.getRoute()).driver(offer.getDriver()).scheduledDeparture(offer.getDepartureAt()).status(TripStatus.SCHEDULED).build()));}
+    private String json(java.util.UUID id){return "{\\\"tripId\\\":\\\""+id+"\\\"}";}
 
     private boolean hasFatecEndpoint(String origin, String destination) {
         return (origin != null && origin.toUpperCase().contains("FATEC")) || (destination != null && destination.toUpperCase().contains("FATEC"));
