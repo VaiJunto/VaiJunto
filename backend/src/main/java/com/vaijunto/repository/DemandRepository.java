@@ -21,7 +21,8 @@ public interface DemandRepository extends JpaRepository<Demand, UUID> {
     @Query(value = "SELECT d.* FROM demands d " +
             "WHERE d.status = 'OPEN' " +
             "AND d.desired_time >= :startTime " +
-            "AND ST_DWithin(d.origin_location, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326), :distanceInMeters)",
+            "AND ST_DWithin(d.origin_location, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326), :distanceInMeters) " +
+            "ORDER BY ST_Distance(d.origin_location, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)), d.desired_time ASC",
             nativeQuery = true)
     List<Demand> findOpenDemandsNearOrigin(
             @Param("lon") double lon,

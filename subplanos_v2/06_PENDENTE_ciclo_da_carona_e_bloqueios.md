@@ -1,7 +1,7 @@
 # Subplano 06 — Ciclo da carona e bloqueios
 
-Progresso do subplano: **0%**  
-Estado: **Aguardando subplanos 03–05**  
+Progresso do subplano: **75%**  
+Estado: **Pendente de integração mobile**  
 Depende de: **03, 04 e 05 concluídos**
 
 ## Instrução de contexto
@@ -18,12 +18,12 @@ ausência, avaliação privada e bloqueio consistente.
 
 | Item | Entrega | Progresso | Estado | Evidência |
 |---|---|---:|---|---|
-| US-OFE-01 | Editar oferta | 0% | Aguardando oferta/aceites | — |
-| US-OFE-02 | Cancelar oferta | 0% | Aguardando notificações | — |
-| US-OFE-03 | Iniciar carona | 0% | Aguardando participantes | — |
-| US-OFE-04 | Ausência e contestação | 0% | Aguardando início/admin base | — |
-| US-OFE-05 | Finalizar e avaliar | 0% | Aguardando início/localização | — |
-| US-BLO-01 | Bloquear e desbloquear | 0% | Aguardando listas/chat | — |
+| US-OFE-01 | Editar oferta | 75% | API pronta; falta expor edição na interface. | `OfferService.update`, validações de janela e reconfirmação. |
+| US-OFE-02 | Cancelar oferta | 75% | API pronta; falta ação de cancelamento na interface. | `OfferService.cancel`, motivo, notificação e auditoria de revisão. |
+| US-OFE-03 | Iniciar carona | 75% | Repositório/provider prontos; falta ação na tela. | `TripService.start`, autorização, janela de antecipação e atraso. |
+| US-OFE-04 | Ausência e contestação | 50% | API pronta; faltam repositório, provider e telas. | `TripService.performCheckIn` e `contestAbsence`, com prazo e notificação. |
+| US-OFE-05 | Finalizar e avaliar | 75% | Repositório/provider parciais; faltam ações e avaliação na tela. | `TripService.finish`, conclusão automática, avaliações privadas e V14. |
+| US-BLO-01 | Bloquear e desbloquear | 75% | Bloqueio e tela de lista prontos; falta validar regra de administrador. | `BlockService`, filtros de oferta e tela `BLOQUEADOS`. |
 
 ## US-OFE-01 — Editar oferta
 
@@ -90,9 +90,20 @@ ausência, avaliação privada e bloqueio consistente.
 - Geolocalização trata permissão negada/GPS impreciso sem prender a carona.
 - Logs de cancelamento, ausência e finalização são auditáveis.
 - Bloqueio é aplicado no backend e testado em todas as consultas e WebSockets.
-- Testes backend/Flutter e versão conforme `CLAUDE.md` estão concluídos.
+- Testes backend/Flutter e versão conforme `CLAUDE.md` estão concluídos depois da integração mobile.
 
-## Ao chegar a 100%
+## Evidências e pendências
+
+- Backend: edição e cancelamento de oferta, máquina de estados da carona,
+  ausência/contestação, finalização, avaliações privadas e bloqueio recíproco.
+- Persistência: migração `V14__ride_lifecycle_reviews_and_blocks.sql`.
+- App: há contratos de ações de carona e gestão em `AJUSTES > BLOQUEADOS`, mas
+  `MyRidesScreen` ainda não apresenta os controles de edição, cancelamento,
+  início, presença/ausência, contestação, finalização e avaliação.
+- Verificação: `mvn test -q`, `mvn package -DskipTests -q`, `flutter test` e
+  `flutter analyze` passam em 2026-08-16.
+
+## Para chegar a 100%
 
 Renomeie para `06_CONCLUIDO_ciclo_da_carona_e_bloqueios.md`, atualize o índice e
 libere o subplano 07. Não reabra este arquivo sem regressão diretamente relacionada.

@@ -32,6 +32,7 @@ class TripServiceTest {
     @Mock UserRepository users;
     @Mock ConversationRepository conversations;
     @Mock NotificationService notifications;
+    @Mock BlockService blocks;
     @InjectMocks TripService service;
 
     @Test
@@ -44,6 +45,7 @@ class TripServiceTest {
         when(users.findById(passengerId)).thenReturn(Optional.of(passenger));
         when(passengers.save(any(TripPassenger.class))).thenAnswer(call -> call.getArgument(0));
         when(conversations.existsByRideIdAndParticipantAIdAndParticipantBId(tripId, driverId, passengerId)).thenReturn(false);
+        when(blocks.blocked(driverId, passengerId)).thenReturn(false);
 
         service.requestSeat(tripId, passengerId);
 

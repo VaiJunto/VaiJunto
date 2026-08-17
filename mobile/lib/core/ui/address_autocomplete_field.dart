@@ -21,11 +21,13 @@ class AddressAutocompleteField extends ConsumerStatefulWidget {
     required this.label,
     required this.hint,
     required this.onSelected,
+    this.initialValue,
   });
 
   final String label;
   final String hint;
   final ValueChanged<GeocodingResult?> onSelected;
+  final GeocodingResult? initialValue;
 
   @override
   ConsumerState<AddressAutocompleteField> createState() =>
@@ -42,6 +44,13 @@ class _AddressAutocompleteFieldState
   bool _outsideRegion = false;
   GeocodingResult? _selected;
   int _searchGeneration = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = widget.initialValue;
+    _controller.text = widget.initialValue?.displayName ?? '';
+  }
 
   @override
   void dispose() {

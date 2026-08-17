@@ -10,6 +10,7 @@ import '../../../auth/data/models/user_model.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../vehicles/presentation/screens/vehicles_screen.dart';
 import '../../../addresses/presentation/screens/addresses_screen.dart';
+import '../../../notifications/presentation/notification_settings_screen.dart';
 import 'blocked_users_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -108,10 +109,12 @@ class SettingsScreen extends ConsumerWidget {
                         builder: (_) => const BlockedUsersScreen())),
                   ),
                   const _HudDivider(),
-                  const _SettingRow(
+                  _SettingRow(
                     icon: Icons.notifications_outlined,
                     title: 'Notificações',
-                    subtitle: 'Viagens, pedidos e mensagens',
+                    subtitle: 'Prévia e alertas do chat',
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => const NotificationSettingsScreen())),
                   ),
                   const _HudDivider(),
                   const _SettingRow(
@@ -190,7 +193,11 @@ class _SettingRow extends StatelessWidget {
                   ],
                 ),
               ),
-              NeoBadge(color: scheme.secondary, child: const Text('EM BREVE')),
+              if (onTap != null)
+                Icon(Icons.arrow_forward_rounded, color: scheme.secondary)
+              else
+                NeoBadge(
+                    color: scheme.secondary, child: const Text('EM BREVE')),
             ],
           ),
         ));

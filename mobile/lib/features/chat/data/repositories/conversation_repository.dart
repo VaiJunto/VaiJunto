@@ -93,6 +93,7 @@ class ChatMessage {
       required this.clientId,
       required this.senderId,
       required this.kind,
+      this.adminSenderName,
       this.body,
       this.locationJson,
       this.mediaIds = const [],
@@ -104,6 +105,7 @@ class ChatMessage {
       required this.deleted});
   final String id, clientId, kind;
   final String? senderId;
+  final String? adminSenderName;
   final List<String> mediaIds;
   final List<ChatMedia> media;
   final String? body;
@@ -117,6 +119,7 @@ class ChatMessage {
       id: j['id'] as String,
       clientId: j['clientId'] as String,
       senderId: j['senderId'] as String?,
+      adminSenderName: j['adminSenderName'] as String?,
       kind: j['kind'] as String,
       body: j['body'] as String?,
       locationJson: j['locationJson'] as String?,

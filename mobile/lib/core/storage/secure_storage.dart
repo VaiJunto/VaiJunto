@@ -13,6 +13,7 @@ class SecureStorage {
   SecureStorage(this._storage);
 
   static const String _tokenKey = 'jwt_token';
+  static const String _adminTokenKey = 'admin_jwt_token';
   static const String _userIdKey = 'user_id';
   static const String _deviceIdKey = 'device_id';
 
@@ -27,6 +28,13 @@ class SecureStorage {
   Future<void> deleteToken() async {
     await _storage.delete(key: _tokenKey);
   }
+
+  Future<void> saveAdminToken(String token) async =>
+      _storage.write(key: _adminTokenKey, value: token);
+
+  Future<String?> getAdminToken() async => _storage.read(key: _adminTokenKey);
+
+  Future<void> deleteAdminToken() async => _storage.delete(key: _adminTokenKey);
 
   Future<void> saveUserId(String userId) async {
     await _storage.write(key: _userIdKey, value: userId);

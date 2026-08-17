@@ -9,6 +9,7 @@ import '../../../../core/ui/app_snackbar.dart';
 import '../../../../core/ui/fatec_direction_selector.dart';
 import '../../../../core/ui/neo_button.dart';
 import '../../../../core/ui/neo_flow_header.dart';
+import '../../../../core/ui/neo_street_backdrop.dart';
 import '../providers/demand_provider.dart';
 
 class CreateDemandScreen extends ConsumerStatefulWidget {
@@ -116,10 +117,16 @@ class _CreateDemandScreenState extends ConsumerState<CreateDemandScreen> {
     );
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar:
           widget.embedded ? null : AppBar(title: const Text('PEDIR CARONA')),
-      body: body,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          const NeoStreetBackdrop(),
+          body,
+        ],
+      ),
     );
   }
 

@@ -695,6 +695,21 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
                                         children: [
+                                          if (message.adminSenderName != null)
+                                            Padding(
+                                                padding: const EdgeInsets.only(
+                                                    bottom: 4),
+                                                child: Text(
+                                                    'ADMIN • ${message.adminSenderName}',
+                                                    style: TextStyle(
+                                                        color: mine
+                                                            ? Colors.white
+                                                            : scheme.secondary,
+                                                        fontFamily:
+                                                            'IBMPlexMono',
+                                                        fontSize: 10,
+                                                        fontWeight:
+                                                            FontWeight.w800))),
                                           Text(
                                               message.deleted
                                                   ? 'MENSAGEM APAGADA'

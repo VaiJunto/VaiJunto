@@ -55,6 +55,42 @@ void main() {
     expect(selectedIndex, 2);
   });
 
+  testWidgets('navbar mantém o ícone de Minhas em telas estreitas',
+      (tester) async {
+    tester.view.physicalSize = const Size(240, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildNeoBrutalTheme(Brightness.light),
+        home: Scaffold(
+          bottomNavigationBar: NeoBottomNavBar(
+            currentIndex: 1,
+            onSelected: (_) {},
+            destinations: const [
+              NeoBottomNavDestination(
+                  icon: Icons.route_rounded, label: 'Caronas'),
+              NeoBottomNavDestination(
+                icon: Icons.directions_car_filled_rounded,
+                label: 'Minhas',
+              ),
+              NeoBottomNavDestination(
+                  icon: Icons.forum_outlined, label: 'Chat'),
+              NeoBottomNavDestination(
+                  icon: Icons.tune_rounded, label: 'Ajustes'),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byIcon(Icons.directions_car_filled_rounded), findsOneWidget);
+    expect(find.text('MINHAS'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('área autenticada não estoura em largura de celular',
       (tester) async {
     tester.view.physicalSize = const Size(390, 844);

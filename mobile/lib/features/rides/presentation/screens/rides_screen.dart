@@ -35,6 +35,7 @@ class _RidesScreenState extends ConsumerState<RidesScreen> {
   DateTime? _date;
   TimeOfDay? _time;
   String _neighborhood = '';
+  bool _showAdvancedFilters = false;
 
   void _refresh() {
     if (_mode == RideFeedMode.offers) {
@@ -116,7 +117,15 @@ class _RidesScreenState extends ConsumerState<RidesScreen> {
                   date: _date,
                   time: _time,
                   neighborhood: _neighborhood,
-                  onDirection: (value) => setState(() => _direction = value),
+                  showAdvancedFilters: _showAdvancedFilters,
+                  onDirection: (value) => setState(() {
+                    _direction = value;
+                    if (value != TripDirectionFilter.fromFatec) {
+                      _neighborhood = '';
+                    }
+                  }),
+                  onToggleAdvanced: () => setState(
+                      () => _showAdvancedFilters = !_showAdvancedFilters),
                   onDate: () async {
                     final result = await showDatePicker(
                         context: context,
@@ -138,6 +147,7 @@ class _RidesScreenState extends ConsumerState<RidesScreen> {
                     _date = null;
                     _time = null;
                     _neighborhood = '';
+                    _showAdvancedFilters = false;
                   }),
                 ),
               ],
@@ -241,7 +251,9 @@ class _FeedFilters extends StatelessWidget {
       required this.date,
       required this.time,
       required this.neighborhood,
+      required this.showAdvancedFilters,
       required this.onDirection,
+      required this.onToggleAdvanced,
       required this.onDate,
       required this.onTime,
       required this.onNeighborhood,
@@ -250,44 +262,156 @@ class _FeedFilters extends StatelessWidget {
   final DateTime? date;
   final TimeOfDay? time;
   final String neighborhood;
+  final bool showAdvancedFilters;
   final ValueChanged<TripDirectionFilter> onDirection;
+  final VoidCallback onToggleAdvanced;
   final VoidCallback onDate, onTime, onClear;
   final ValueChanged<String> onNeighborhood;
   @override
-  Widget build(BuildContext context) =>
-      Wrap(spacing: 7, runSpacing: 7, children: [
-        ChoiceChip(
-            label: const Text('TODAS'),
-            selected: direction == TripDirectionFilter.any,
-            onSelected: (_) => onDirection(TripDirectionFilter.any)),
-        ChoiceChip(
-            label: const Text('INDO À FATEC'),
-            selected: direction == TripDirectionFilter.toFatec,
-            onSelected: (_) => onDirection(TripDirectionFilter.toFatec)),
-        ChoiceChip(
-            label: const Text('SAINDO DA FATEC'),
-            selected: direction == TripDirectionFilter.fromFatec,
-            onSelected: (_) => onDirection(TripDirectionFilter.fromFatec)),
-        ActionChip(
-            label: Text(date == null
-                ? 'DATA'
-                : '${date!.day.toString().padLeft(2, '0')}/${date!.month.toString().padLeft(2, '0')}'),
-            onPressed: onDate),
-        ActionChip(
-            label: Text(time == null ? 'HORÁRIO' : time!.format(context)),
-            onPressed: onTime),
-        SizedBox(
-            width: 130,
-            child: TextField(
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final hasRefinements =
+        date != null || time != null || neighborhood.isNotEmpty;
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Container(
+        decoration: BoxDecoration(
+          color: scheme.surface,
+          border: Border.all(color: scheme.outline, width: 2),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(children: [
+          _DirectionFilterButton(
+              label: 'TODAS',
+              selected: direction == TripDirectionFilter.any,
+              onTap: () => onDirection(TripDirectionFilter.any)),
+          _DirectionFilterButton(
+              label: 'INDO A FATEC',
+              selected: direction == TripDirectionFilter.toFatec,
+              onTap: () => onDirection(TripDirectionFilter.toFatec)),
+          _DirectionFilterButton(
+              label: 'SAINDO',
+              selected: direction == TripDirectionFilter.fromFatec,
+              onTap: () => onDirection(TripDirectionFilter.fromFatec)),
+        ]),
+      ),
+      const SizedBox(height: 6),
+      Row(children: [
+        TextButton.icon(
+          onPressed: onToggleAdvanced,
+          icon: Icon(
+              showAdvancedFilters ? Icons.tune_rounded : Icons.tune_outlined),
+          label: Text(showAdvancedFilters ? 'OCULTAR FILTROS' : 'REFINAR'),
+          style: TextButton.styleFrom(
+            foregroundColor: scheme.tertiary,
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+            textStyle: theme.textTheme.labelSmall?.copyWith(
+                fontFamily: 'IBMPlexMono',
+                fontWeight: FontWeight.w800,
+                letterSpacing: .45),
+          ),
+        ),
+        if (hasRefinements) ...[
+          const SizedBox(width: 4),
+          TextButton(onPressed: onClear, child: const Text('LIMPAR')),
+        ],
+      ]),
+      if (showAdvancedFilters) ...[
+        const SizedBox(height: 4),
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          _RefinementButton(
+              icon: Icons.calendar_today_outlined,
+              label: date == null
+                  ? 'DATA'
+                  : '${date!.day.toString().padLeft(2, '0')}/${date!.month.toString().padLeft(2, '0')}',
+              onTap: onDate),
+          _RefinementButton(
+              icon: Icons.schedule_rounded,
+              label: time == null ? 'HORARIO' : time!.format(context),
+              onTap: onTime),
+          if (direction == TripDirectionFilter.fromFatec)
+            SizedBox(
+              width: 164,
+              child: TextField(
                 onChanged: onNeighborhood,
-                decoration:
-                    const InputDecoration(isDense: true, hintText: 'Bairro'))),
-        if (direction != TripDirectionFilter.any ||
-            date != null ||
-            time != null ||
-            neighborhood.isNotEmpty)
-          ActionChip(label: const Text('LIMPAR'), onPressed: onClear),
-      ]);
+                decoration: const InputDecoration(
+                    isDense: true,
+                    prefixIcon: Icon(Icons.location_on_outlined, size: 18),
+                    hintText: 'Bairro de destino'),
+              ),
+            ),
+        ]),
+      ],
+    ]);
+  }
+}
+
+class _DirectionFilterButton extends StatelessWidget {
+  const _DirectionFilterButton(
+      {required this.label, required this.selected, required this.onTap});
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Expanded(
+      child: Semantics(
+        button: true,
+        selected: selected,
+        label: label,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(5),
+          child: Container(
+            height: 38,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+                color: selected ? scheme.primary : Colors.transparent,
+                borderRadius: BorderRadius.circular(5)),
+            child: Text(label,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: selected ? scheme.onPrimary : scheme.onSurface,
+                    fontFamily: 'IBMPlexMono',
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: .2)),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RefinementButton extends StatelessWidget {
+  const _RefinementButton(
+      {required this.icon, required this.label, required this.onTap});
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return OutlinedButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 16),
+      label: Text(label),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: scheme.onSurface,
+        side: BorderSide(color: scheme.outline, width: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
+        textStyle: Theme.of(context).textTheme.labelSmall?.copyWith(
+            fontFamily: 'IBMPlexMono',
+            fontWeight: FontWeight.w800,
+            letterSpacing: .35),
+      ),
+    );
+  }
 }
 
 class _OfferList extends StatelessWidget {

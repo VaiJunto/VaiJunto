@@ -73,7 +73,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       const NeoBottomNavDestination(
           icon: Icons.route_rounded, label: 'Caronas'),
       NeoBottomNavDestination(
-          icon: Icons.event_note_rounded,
+          icon: Icons.directions_car_filled_rounded,
           label: 'Minhas',
           badgeCount: upcomingCount),
       const NeoBottomNavDestination(icon: Icons.forum_outlined, label: 'Chat'),

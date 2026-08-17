@@ -29,7 +29,8 @@ public interface OfferRepository extends JpaRepository<Offer, UUID> {
             "JOIN routes r ON o.route_id = r.id " +
             "WHERE o.status = 'ACTIVE' " +
             "AND (r.is_recurrent = TRUE OR o.departure_at >= :startTime) " +
-            "AND ST_DWithin(r.origin_location, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326), :distanceInMeters)",
+            "AND ST_DWithin(r.origin_location, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326), :distanceInMeters) " +
+            "ORDER BY ST_Distance(r.origin_location, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)), o.departure_at ASC",
             nativeQuery = true)
     List<Offer> findActiveOffersNearOrigin(
             @Param("lon") double lon,

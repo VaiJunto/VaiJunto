@@ -29,17 +29,12 @@ class VaiJuntoApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: buildNeoBrutalTheme(Brightness.light),
       darkTheme: buildNeoBrutalTheme(Brightness.dark),
-      home: const _ResponsiveEntry(),
+      home: const _AppStartup(),
+      routes: {
+        '/admin': (_) => const DesktopAdminEntryScreen(),
+      },
     );
   }
-}
-
-class _ResponsiveEntry extends StatelessWidget {
-  const _ResponsiveEntry();
-  @override
-  Widget build(BuildContext context) => MediaQuery.sizeOf(context).width >= 700
-      ? const DesktopAdminEntryScreen()
-      : const _AppStartup();
 }
 
 /// Tela raiz: espera a restauração de sessão terminar antes de decidir entre

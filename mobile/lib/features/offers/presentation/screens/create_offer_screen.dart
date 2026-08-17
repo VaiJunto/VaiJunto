@@ -11,6 +11,7 @@ import '../../../../core/ui/fatec_direction_selector.dart';
 import '../../../../core/ui/neo_button.dart';
 import '../../../../core/ui/neo_flow_header.dart';
 import '../../../../core/ui/neo_loading_indicator.dart';
+import '../../../../core/ui/neo_street_backdrop.dart';
 import '../providers/offer_provider.dart';
 import '../../data/models/offer_model.dart';
 import '../../../vehicles/presentation/providers/vehicle_provider.dart';
@@ -234,10 +235,16 @@ class _CreateOfferScreenState extends ConsumerState<CreateOfferScreen> {
     );
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar:
           widget.embedded ? null : AppBar(title: const Text('OFERECER CARONA')),
-      body: body,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          const NeoStreetBackdrop(),
+          body,
+        ],
+      ),
     );
   }
 
