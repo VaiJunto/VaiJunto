@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../../../../core/app_version.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/secure_storage.dart';
 import '../../../../core/theme/neo_brutal_theme.dart';
@@ -111,7 +112,9 @@ class _DesktopAdminEntryScreenState
                                               color: scheme.tertiary,
                                               fontFamily: 'IBMPlexMono',
                                               fontWeight: FontWeight.w700,
-                                              fontSize: 11))
+                                              fontSize: 11)),
+                                      const SizedBox(height: 8),
+                                      _AdminBuildStamp(scheme: scheme)
                                     ]))),
                         SizedBox(
                             width: 460,
@@ -227,6 +230,43 @@ class _DesktopAdminEntryScreenState
 }
 
 enum _AdminSection { people, reports, stickers, tags, accounts }
+
+class _AdminBuildStamp extends StatelessWidget {
+  const _AdminBuildStamp({required this.scheme, this.compact = false});
+
+  final ColorScheme scheme;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 7 : 9,
+          vertical: compact ? 4 : 6,
+        ),
+        decoration: BoxDecoration(
+          color: scheme.tertiary.withValues(alpha: .12),
+          border: Border.all(color: scheme.tertiary, width: 1.5),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.cloud_done_outlined,
+                size: compact ? 13 : 15, color: scheme.tertiary),
+            const SizedBox(width: 6),
+            Text(
+              'BUILD $kBuildLabel',
+              style: TextStyle(
+                color: scheme.tertiary,
+                fontFamily: 'IBMPlexMono',
+                fontWeight: FontWeight.w800,
+                letterSpacing: .5,
+                fontSize: compact ? 9 : 10,
+              ),
+            ),
+          ],
+        ),
+      );
+}
 
 class _AdminOperationsPanel extends ConsumerStatefulWidget {
   const _AdminOperationsPanel({required this.role});
@@ -1284,7 +1324,9 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
               Text('SESSÃO ATIVA', style: _systemText(scheme)),
               const SizedBox(height: 4),
               Text(_roleLabel(widget.role),
-                  style: const TextStyle(fontWeight: FontWeight.w900))
+                  style: const TextStyle(fontWeight: FontWeight.w900)),
+              const SizedBox(height: 10),
+              _AdminBuildStamp(scheme: scheme, compact: true)
             ])),
         const SizedBox(height: 12),
         NeoOutlineButton(
@@ -1307,7 +1349,9 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
                     style:
                         TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
                 Text('VJ//COMMUNITY_OPERATIONS • ${widget.role}',
-                    style: _systemText(scheme))
+                    style: _systemText(scheme)),
+                const SizedBox(height: 5),
+                _AdminBuildStamp(scheme: scheme, compact: true)
               ])),
           IconButton(
               tooltip: 'Alterar minha senha',

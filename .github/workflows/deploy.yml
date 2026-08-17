@@ -67,6 +67,7 @@ jobs:
           push: true
           build-args: |
             API_BASE_URL=https://api.vaijunto.app.br/api/v1
+            BUILD_REVISION=${{ github.sha }}
           tags: |
             ghcr.io/vaijunto/vaijunto-web:latest
             ghcr.io/vaijunto/vaijunto-web:sha-${{ github.sha }}

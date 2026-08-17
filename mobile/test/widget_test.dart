@@ -292,6 +292,7 @@ void main() {
 
     expect(find.text('CENTRAL DE\nOPERAÇÕES'), findsOneWidget);
     expect(find.text('ENTRAR NO PAINEL'), findsOneWidget);
+    expect(find.text('BUILD $kBuildLabel'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
     await tester.tap(find.text('ENTRAR NO PAINEL'));
