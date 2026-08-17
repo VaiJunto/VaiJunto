@@ -29,8 +29,8 @@ class VaiJuntoApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: buildNeoBrutalTheme(Brightness.light),
       darkTheme: buildNeoBrutalTheme(Brightness.dark),
-      home: const _AppStartup(),
       routes: {
+        '/': (_) => const _AppStartup(),
         '/admin': (_) => const DesktopAdminEntryScreen(),
       },
     );
