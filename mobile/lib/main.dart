@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 import 'core/theme/neo_brutal_theme.dart';
 import 'core/ui/neo_card.dart';
 import 'core/ui/neo_loading_indicator.dart';
@@ -12,6 +13,7 @@ import 'features/home/presentation/screens/home_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  usePathUrlStrategy();
   runApp(
     const ProviderScope(
       child: VaiJuntoApp(),

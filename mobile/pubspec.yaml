@@ -1,13 +1,15 @@
 name: vaijunto
 description: App de Transporte Universitário (VaiJunto) - Caronas e Vans.
 publish_to: 'none'
-version: 1.15.1+0
+version: 1.15.2+0
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
 
 dependencies:
   flutter:
+    sdk: flutter
+  flutter_web_plugins:
     sdk: flutter
   flutter_riverpod: ^2.5.1
   dio: ^5.4.1

@@ -140,9 +140,7 @@ class _DesktopAdminEntryScreenState
                                 const SizedBox(height: 12),
                                 NeoOutlineButton(
                                     onPressed: () => Navigator.of(context)
-                                        .pushReplacement(MaterialPageRoute(
-                                            builder: (_) =>
-                                                const LoginScreen())),
+                                        .pushReplacementNamed('/'),
                                     child:
                                         const Text('ABRIR O VAIJUNTO NORMAL')),
                               ])))));
