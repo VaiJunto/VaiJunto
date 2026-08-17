@@ -10,6 +10,7 @@ import 'package:vaijunto/features/auth/data/models/user_model.dart';
 import 'package:vaijunto/features/auth/presentation/screens/login_screen.dart';
 import 'package:vaijunto/features/auth/presentation/screens/register_screen.dart';
 import 'package:vaijunto/features/auth/presentation/widgets/password_requirements.dart';
+import 'package:vaijunto/features/admin/presentation/screens/desktop_admin_entry_screen.dart';
 import 'package:vaijunto/features/home/presentation/screens/home_screen.dart';
 import 'package:vaijunto/features/demands/presentation/providers/demand_provider.dart';
 import 'package:vaijunto/features/offers/presentation/providers/offer_provider.dart';
@@ -262,6 +263,40 @@ void main() {
       tester.getBottomRight(find.byType(PasswordRequirements)).dy,
       lessThan(keyboardTop),
     );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('entrada administrativa se adapta a telas grandes e compactas',
+      (tester) async {
+    tester.view.physicalSize = const Size(1440, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: buildNeoBrutalTheme(Brightness.dark),
+          builder: _disableAnimations,
+          home: const DesktopAdminEntryScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('CENTRAL DE\nOPERAÇÕES'), findsOneWidget);
+    expect(find.text('ENTRAR NO PAINEL'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.text('ENTRAR NO PAINEL'));
+    await tester.pumpAndSettle();
+    expect(find.text('ACESSO ADMINISTRATIVO'), findsOneWidget);
+    expect(find.byType(TextField), findsNWidgets(3));
+    expect(tester.takeException(), isNull);
+
+    tester.view.physicalSize = const Size(900, 760);
+    await tester.pumpAndSettle();
+    expect(find.text('ACESSO ADMINISTRATIVO'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
