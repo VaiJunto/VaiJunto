@@ -22,6 +22,11 @@ void main() {
 class VaiJuntoApp extends StatelessWidget {
   const VaiJuntoApp({super.key});
 
+  static String get _initialRoute {
+    final path = Uri.base.path;
+    return path == '/admin' || path == '/admin/' ? '/admin' : '/';
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -29,6 +34,7 @@ class VaiJuntoApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: buildNeoBrutalTheme(Brightness.light),
       darkTheme: buildNeoBrutalTheme(Brightness.dark),
+      initialRoute: _initialRoute,
       routes: {
         '/': (_) => const _AppStartup(),
         '/admin': (_) => const DesktopAdminEntryScreen(),
