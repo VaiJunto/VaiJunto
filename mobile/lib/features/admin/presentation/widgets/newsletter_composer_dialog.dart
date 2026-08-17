@@ -150,7 +150,7 @@ class _NewsletterComposerState extends State<_NewsletterComposer> {
                 : ReorderableListView.builder(
                     buildDefaultDragHandles: false,
                     itemCount: _components.length,
-                    onReorderItem: _reorder,
+                    onReorder: _reorder,
                     itemBuilder: (context, index) =>
                         _componentCard(scheme, index, key: ValueKey(_components[index]['key'])),
                   )),
@@ -425,10 +425,14 @@ class _NewsletterComposerState extends State<_NewsletterComposer> {
 
   // ------------------------------------------------------------------ ações
 
-  /// `onReorderItem` já entrega o índice de destino ajustado — diferente do
-  /// antigo `onReorder`, que exigia descontar o item removido.
-  void _reorder(int oldIndex, int newIndex) => setState(
-      () => _components.insert(newIndex, _components.removeAt(oldIndex)));
+  /// `onReorder` entrega o índice de destino contando o item que ainda não foi
+  /// removido, por isso o desconto. Existe `onReorderItem`, que já vem
+  /// ajustado, mas só a partir do Flutter 3.41 — o build de produção roda na
+  /// 3.35.7 (ver mobile/Dockerfile).
+  void _reorder(int oldIndex, int newIndex) => setState(() {
+        final target = newIndex > oldIndex ? newIndex - 1 : newIndex;
+        _components.insert(target, _components.removeAt(oldIndex));
+      });
 
   Future<void> _addComponent() async {
     final type = await showDialog<String>(
@@ -479,7 +483,8 @@ class _NewsletterComposerState extends State<_NewsletterComposer> {
           'AUDIO' => FileType.audio,
           _ => FileType.video,
         });
-    final file = result?.files.firstOrNull;
+    final files = result?.files ?? const <PlatformFile>[];
+    final file = files.isEmpty ? null : files.first;
     if (file?.bytes == null || !mounted) return;
     setState(() {
       _uploading = true;

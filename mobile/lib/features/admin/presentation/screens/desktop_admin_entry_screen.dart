@@ -926,7 +926,8 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
   /// administrativa permanente e só prende à mensagem quando ela é enviada.
   Future<Map<String, dynamic>?> _uploadAdminAttachment() async {
     final result = await FilePicker.platform.pickFiles(withData: true);
-    final file = result?.files.firstOrNull;
+    final files = result?.files ?? const <PlatformFile>[];
+    final file = files.isEmpty ? null : files.first;
     if (file?.bytes == null) return null;
     try {
       final response = await ref.read(dioProvider).post('/admin/media',
