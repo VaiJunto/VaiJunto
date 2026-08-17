@@ -10,8 +10,11 @@ import java.security.SecureRandom;
 final class Totp {
     private Totp() {}
     static boolean verify(String base32Secret, String submitted) {
+        return verify(base32Secret, submitted, Instant.now());
+    }
+    static boolean verify(String base32Secret, String submitted, Instant instant) {
         if (submitted == null || !submitted.matches("\\d{6}")) return false;
-        long now = Instant.now().getEpochSecond() / 30;
+        long now = instant.getEpochSecond() / 30;
         for (long step = now - 1; step <= now + 1; step++) if (code(base32Secret, step).equals(submitted)) return true;
         return false;
     }
@@ -33,7 +36,7 @@ final class Totp {
     private static byte[] decode(String input) {
         String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"; String normalized = input.replace("=", "").replaceAll("\\s", "").toUpperCase();
         ByteBuffer out = ByteBuffer.allocate(normalized.length() * 5 / 8); int buffer = 0, bits = 0;
-        for (char c : normalized.toCharArray()) { int v = chars.indexOf(c); if (v < 0) throw new IllegalArgumentException("Invalid TOTP secret"); buffer = (buffer << 5) | v; bits += 5; if (bits >= 8) { out.put((byte) (buffer >> (bits - 8))); bits -= 8; } }
+        for (char c : normalized.toCharArray()) { int v = chars.indexOf(c); if (v < 0) throw new IllegalArgumentException("Invalid TOTP secret"); buffer = (buffer << 5) | v; bits += 5; if (bits >= 8) { out.put((byte) (buffer >> (bits - 8))); bits -= 8; buffer &= (1 << bits) - 1; } }
         byte[] result = new byte[out.position()]; out.flip(); out.get(result); return result;
     }
 }
