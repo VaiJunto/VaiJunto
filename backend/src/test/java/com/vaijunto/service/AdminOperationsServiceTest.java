@@ -22,7 +22,7 @@ class AdminOperationsServiceTest {
   private User user;
 
   @BeforeEach void setUp() {
-    service = new AdminOperationsService(admins, audits, users, mock(MessageReportRepository.class), mock(ReportEvidenceSnapshotRepository.class), mock(ChatStickerRepository.class), notifications, mock(ConversationRepository.class), mock(ConversationMessageRepository.class), mock(VehicleRepository.class), mock(OfferRepository.class), mock(MediaStorageService.class));
+    service = new AdminOperationsService(admins, audits, users, mock(MessageReportRepository.class), mock(ReportEvidenceSnapshotRepository.class), mock(ChatStickerRepository.class), notifications, mock(ConversationRepository.class), mock(ConversationMessageRepository.class), mock(VehicleRepository.class), mock(OfferRepository.class), mock(MediaStorageService.class), mock(AdminUserTagRepository.class), mock(AdminUserTagAssignmentRepository.class));
     user = User.builder().id(UUID.randomUUID()).name("Ana").fullName("Ana Fatec").email("ana@fatec.sp.gov.br").build();
     when(users.findById(user.getId())).thenReturn(Optional.of(user));
     when(admins.findByEmail("admin@vaijunto.app")).thenReturn(Optional.of(AdminAccount.builder().id(UUID.randomUUID()).email("admin@vaijunto.app").build()));
