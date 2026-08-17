@@ -1,8 +1,14 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vaijunto/core/app_version.dart';
 import 'package:vaijunto/core/theme/neo_brutal_theme.dart';
+import 'package:vaijunto/core/network/api_client.dart';
 import 'package:vaijunto/core/ui/neo_bottom_nav_bar.dart';
 import 'package:vaijunto/core/ui/neo_button.dart';
 import 'package:vaijunto/core/ui/neo_street_backdrop.dart';
@@ -299,6 +305,83 @@ void main() {
     expect(find.text('ACESSO ADMINISTRATIVO'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('chat administrativo abre, carrega e envia mensagem',
+      (tester) async {
+    tester.view.physicalSize = const Size(1440, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    FlutterSecureStorage.setMockInitialValues({});
+
+    final adapter = _AdminFixtureAdapter();
+    final dio = Dio(BaseOptions(baseUrl: 'https://fixture.test'))
+      ..httpClientAdapter = adapter;
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [dioProvider.overrideWithValue(dio)],
+        child: MaterialApp(
+          theme: buildNeoBrutalTheme(Brightness.dark),
+          builder: _disableAnimations,
+          home: const DesktopAdminEntryScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('ENTRAR NO PAINEL'));
+    await tester.pumpAndSettle();
+
+    final credentials = find.byType(TextField);
+    await tester.enterText(credentials.at(0), 'admin@vaijunto.app');
+    await tester.enterText(credentials.at(1), 'senha-segura');
+    await tester.enterText(credentials.at(2), '123456');
+    await tester.tap(find.text('ACESSAR PAINEL'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ana Fatec'), findsOneWidget);
+    await tester.tap(find.text('Ana Fatec'));
+    await tester.pumpAndSettle();
+    expect(find.text('ABRIR CHAT ADMINISTRATIVO'), findsOneWidget);
+    expect(find.byIcon(Icons.chat_bubble_outline), findsWidgets);
+
+    await tester.tap(find.text('ABRIR CHAT ADMINISTRATIVO'));
+    await tester.pumpAndSettle();
+    expect(find.text('CONVERSA AINDA VAZIA'), findsOneWidget);
+    expect(find.textContaining('MENSAGENS PERMANENTES'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField).last, 'Vamos ajudar você.');
+    await tester.tap(find.byIcon(Icons.send));
+    await tester.pumpAndSettle();
+
+    expect(adapter.sentMessages, 1);
+    expect(find.text('Vamos ajudar você.'), findsOneWidget);
+
+    await tester.tap(find.text('FECHAR'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('FIGURINHAS'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('NOVA FIGURINHA'));
+    await tester.pumpAndSettle();
+    expect(find.text('CADASTRAR FIGURINHA'), findsNWidgets(2));
+    expect(find.text('ESCOLHER ARQUIVO'), findsOneWidget);
+    expect(find.text('PRÉVIA DO ASSET'), findsNothing);
+    await tester.tap(find.text('CANCELAR'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('TAGS'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('NOVA TAG'));
+    await tester.pumpAndSettle();
+    expect(find.text('CRIAR TAG DE PESSOA'), findsOneWidget);
+    expect(find.text('ANEXAR ÍCONE SVG'), findsOneWidget);
+    await tester.tap(find.byTooltip('Criar cor personalizada'));
+    await tester.pumpAndSettle();
+    expect(find.text('COR PERSONALIZADA'), findsOneWidget);
+    expect(find.text('SELETOR VISUAL'), findsOneWidget);
+    expect(find.text('Código hexadecimal'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 Widget _disableAnimations(BuildContext context, Widget? child) {
@@ -306,4 +389,76 @@ Widget _disableAnimations(BuildContext context, Widget? child) {
     data: MediaQuery.of(context).copyWith(disableAnimations: true),
     child: child!,
   );
+}
+
+class _AdminFixtureAdapter implements HttpClientAdapter {
+  int sentMessages = 0;
+  final List<Map<String, Object?>> _messages = [];
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    final data = switch ((options.method, options.path)) {
+      ('POST', '/admin/auth/login') => {
+          'token': 'fixture-token',
+          'role': 'SUPER_ADMIN'
+        },
+      ('GET', '/admin/users') => [
+          {
+            'id': '00000000-0000-0000-0000-000000000001',
+            'fullName': 'Ana Fatec',
+            'email': 'ana@fatec.sp.gov.br',
+            'verificationStatus': 'VERIFIED',
+            'tags': <Object>[]
+          }
+        ],
+      ('GET', '/admin/reports') => <Object>[],
+      ('GET', '/admin/stickers') => <Object>[],
+      ('GET', '/admin/tags') => <Object>[],
+      ('GET', '/admin/accounts') => <Object>[],
+      (
+        'POST',
+        '/admin/users/00000000-0000-0000-0000-000000000001/conversation'
+      ) =>
+        {'conversationId': '00000000-0000-0000-0000-000000000002'},
+      (
+        'GET',
+        '/admin/conversations/00000000-0000-0000-0000-000000000002/messages'
+      ) =>
+        _messages,
+      (
+        'POST',
+        '/admin/conversations/00000000-0000-0000-0000-000000000002/messages'
+      ) =>
+        _saveMessage(options.data),
+      _ => throw StateError(
+          'Requisição administrativa não prevista: ${options.method} ${options.path}'),
+    };
+    return ResponseBody.fromString(
+      jsonEncode(data),
+      200,
+      headers: {
+        Headers.contentTypeHeader: ['application/json']
+      },
+    );
+  }
+
+  Map<String, String> _saveMessage(Object? data) {
+    sentMessages++;
+    final body = (data as Map)['body'].toString();
+    _messages.add({
+      'id': 'message-$sentMessages',
+      'body': body,
+      'sentAt': '2026-08-17T12:00:00-03:00',
+      'fromAdmin': true,
+      'sender': 'Administrador'
+    });
+    return {'conversationId': '00000000-0000-0000-0000-000000000002'};
+  }
+
+  @override
+  void close({bool force = false}) {}
 }

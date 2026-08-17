@@ -298,205 +298,293 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
     final code = TextEditingController();
     final label = TextEditingController();
     PlatformFile? asset;
+    String? fileError;
     final ok = await _showAdminDialog<bool>(
         context: context,
         builder: (context) => StatefulBuilder(
             builder: (context, setDialog) => AlertDialog(
-                    title: const Text('Cadastrar figurinha'),
-                    content: SizedBox(
-                        width: 460,
-                        child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                  'Uma reação visual para o chat. PNG, JPG, WEBP ou GIF animado, até 2 MB.'),
-                              const SizedBox(height: 16),
+                    title: const _AdminDialogTitle(
+                        icon: Icons.emoji_emotions_outlined,
+                        code: 'VJ//NEW_CHAT_ASSET',
+                        title: 'CADASTRAR FIGURINHA'),
+                    content: ConstrainedBox(
+                        constraints:
+                            const BoxConstraints(maxWidth: 540, maxHeight: 610),
+                        child: SingleChildScrollView(
+                            child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                              Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .secondary
+                                          .withValues(alpha: .14),
+                                      border: Border.all(
+                                          color:
+                                              Theme.of(context).colorScheme.ink,
+                                          width: 2)),
+                                  child: const Row(children: [
+                                    Icon(Icons.chat_bubble_outline, size: 19),
+                                    SizedBox(width: 10),
+                                    Expanded(
+                                        child: Text(
+                                            'Crie uma reação visual curta para as conversas do VaiJunto.'))
+                                  ])),
+                              const SizedBox(height: 18),
                               TextField(
                                   controller: label,
+                                  onChanged: (_) => setDialog(() {}),
                                   decoration: const InputDecoration(
                                       labelText: 'Nome da figurinha',
-                                      hintText: 'Ex.: Comemorando')),
+                                      hintText: 'Ex.: Comemorando',
+                                      prefixIcon: Icon(Icons.title_outlined))),
                               const SizedBox(height: 12),
                               TextField(
                                   controller: code,
+                                  onChanged: (_) => setDialog(() {}),
                                   decoration: const InputDecoration(
                                       labelText: 'Código interno',
-                                      hintText: 'Ex.: comemorando_01')),
-                              const SizedBox(height: 16),
-                              OutlinedButton.icon(
-                                  onPressed: () async {
-                                    final result = await FilePicker.platform
-                                        .pickFiles(
-                                            type: FileType.custom,
-                                            allowedExtensions: const [
-                                              'png',
-                                              'jpg',
-                                              'jpeg',
-                                              'webp',
-                                              'gif'
-                                            ],
-                                            withData: true);
-                                    if (result != null)
-                                      setDialog(
-                                          () => asset = result.files.single);
-                                  },
-                                  icon: const Icon(Icons.upload_file_outlined),
-                                  label: Text(asset == null
-                                      ? 'ESCOLHER ARQUIVO'
-                                      : 'TROCAR ARQUIVO')),
-                              if (asset != null)
+                                      hintText: 'Ex.: comemorando_01',
+                                      helperText:
+                                          'Use letras minúsculas, números e underline.',
+                                      prefixIcon: Icon(Icons.code))),
+                              const SizedBox(height: 18),
+                              Text('ARQUIVO DA FIGURINHA',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .labelMedium
+                                      ?.copyWith(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .tertiary,
+                                          fontSize: 10)),
+                              const SizedBox(height: 8),
+                              _AdminFilePickerButton(
+                                label: asset == null
+                                    ? 'ESCOLHER ARQUIVO'
+                                    : 'TROCAR ARQUIVO',
+                                helper:
+                                    'PNG • JPG • WEBP • GIF ANIMADO • ATÉ 2 MB',
+                                fileName: asset?.name,
+                                onPressed: () async {
+                                  final result = await FilePicker.platform
+                                      .pickFiles(
+                                          type: FileType.custom,
+                                          allowedExtensions: const [
+                                            'png',
+                                            'jpg',
+                                            'jpeg',
+                                            'webp',
+                                            'gif'
+                                          ],
+                                          withData: true);
+                                  if (result == null) return;
+                                  final selected = result.files.single;
+                                  setDialog(() {
+                                    if (selected.size > 2 * 1024 * 1024) {
+                                      asset = null;
+                                      fileError =
+                                          'O arquivo excede o limite de 2 MB.';
+                                    } else {
+                                      asset = selected;
+                                      fileError = null;
+                                    }
+                                  });
+                                },
+                              ),
+                              if (fileError != null)
                                 Padding(
-                                    padding: const EdgeInsets.only(top: 12),
+                                    padding: const EdgeInsets.only(top: 10),
+                                    child: Text(fileError!,
+                                        style: TextStyle(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .error,
+                                            fontWeight: FontWeight.w700))),
+                              if (asset != null)
+                                Container(
+                                    width: double.infinity,
+                                    margin: const EdgeInsets.only(top: 14),
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .surfaceContainerHighest,
+                                        border: Border.all(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .ink,
+                                            width: 2)),
                                     child: Row(children: [
                                       if (asset!.bytes != null)
-                                        ClipRRect(
-                                            borderRadius:
-                                                BorderRadius.circular(8),
+                                        Container(
+                                            width: 72,
+                                            height: 72,
+                                            padding: const EdgeInsets.all(5),
+                                            decoration: BoxDecoration(
+                                                color: Colors.white,
+                                                border: Border.all(
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .ink,
+                                                    width: 2)),
                                             child: Image.memory(asset!.bytes!,
-                                                width: 64,
-                                                height: 64,
-                                                fit: BoxFit.cover)),
+                                                fit: BoxFit.contain)),
                                       const SizedBox(width: 12),
                                       Expanded(
-                                          child: Text(
-                                              '${asset!.name}\n${(asset!.size / 1024).toStringAsFixed(0)} KB'))
+                                          child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                            const Text('PRÉVIA DO ASSET',
+                                                style: TextStyle(
+                                                    fontFamily: 'IBMPlexMono',
+                                                    fontWeight: FontWeight.w700,
+                                                    fontSize: 9)),
+                                            const SizedBox(height: 5),
+                                            Text(asset!.name,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                    fontWeight:
+                                                        FontWeight.w900)),
+                                            const SizedBox(height: 3),
+                                            Text(
+                                                '${(asset!.size / 1024).toStringAsFixed(0)} KB • PRONTO PARA ENVIAR',
+                                                style: TextStyle(
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .tertiary,
+                                                    fontFamily: 'IBMPlexMono',
+                                                    fontSize: 9,
+                                                    fontWeight:
+                                                        FontWeight.w700))
+                                          ]))
                                     ]))
-                            ])),
+                            ]))),
                     actions: [
                       TextButton(
                           onPressed: () => Navigator.pop(context, false),
-                          child: const Text('Cancelar')),
+                          child: const Text('CANCELAR')),
                       FilledButton(
-                          onPressed: asset == null
+                          onPressed: asset == null ||
+                                  label.text.trim().isEmpty ||
+                                  code.text.trim().isEmpty
                               ? null
                               : () => Navigator.pop(context, true),
-                          child: const Text('Salvar'))
+                          child: const Text('CADASTRAR FIGURINHA'))
                     ])));
-    if (ok == true && asset?.bytes != null)
-      try {
-        await ref.read(dioProvider).post('/admin/stickers',
-            data: FormData.fromMap({
-              'code': code.text.trim(),
-              'label': label.text.trim(),
-              'asset':
-                  MultipartFile.fromBytes(asset!.bytes!, filename: asset!.name)
-            }));
-        await _refresh();
-      } on DioException catch (e) {
-        _showError(_message(e, 'Não foi possível cadastrar a figurinha.'));
-      } finally {
-        code.dispose();
-        label.dispose();
-      }
+    if (ok != true || asset?.bytes == null) {
+      await _disposeControllersAfterDialog([code, label]);
+      return;
+    }
+    try {
+      await ref.read(dioProvider).post('/admin/stickers',
+          data: FormData.fromMap({
+            'code': code.text.trim(),
+            'label': label.text.trim(),
+            'asset':
+                MultipartFile.fromBytes(asset!.bytes!, filename: asset!.name)
+          }));
+      await _refresh();
+    } on DioException catch (e) {
+      _showError(_message(e, 'Não foi possível cadastrar a figurinha.'));
+    } finally {
+      await _disposeControllersAfterDialog([code, label]);
+    }
   }
 
   Future<void> _createTagWithFile() async {
     final name = TextEditingController();
-    const colors = [
-      Color(0xFF00AEEF),
-      Color(0xFFE91E63),
-      Color(0xFF9C27B0),
-      Color(0xFF673AB7),
-      Color(0xFF3F51B5),
-      Color(0xFF009688),
-      Color(0xFF4CAF50),
-      Color(0xFFFF9800),
-      Color(0xFFF44336),
-      Color(0xFF795548),
-      Color(0xFF607D8B),
-      Color(0xFF111827)
-    ];
-    Color color = colors.first;
+    Color color = NeoBrutal.cyan;
     PlatformFile? icon;
     final ok = await _showAdminDialog<bool>(
         context: context,
         builder: (context) => StatefulBuilder(
             builder: (context, setDialog) => AlertDialog(
-                    title: const Text('Criar tag de pessoa'),
-                    content: SizedBox(
-                        width: 460,
-                        child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
+                    title: const _AdminDialogTitle(
+                        icon: Icons.new_label_outlined,
+                        code: 'VJ//NEW_PROFILE_TAG',
+                        title: 'CRIAR TAG DE PESSOA'),
+                    content: ConstrainedBox(
+                        constraints:
+                            const BoxConstraints(maxWidth: 520, maxHeight: 620),
+                        child: SingleChildScrollView(
+                            child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
                               TextField(
                                   controller: name,
+                                  onChanged: (_) => setDialog(() {}),
                                   decoration: const InputDecoration(
                                       labelText: 'Nome da tag',
-                                      hintText: 'Ex.: Motorista parceiro')),
-                              const SizedBox(height: 18),
-                              const Text('Cor da tag'),
+                                      hintText: 'Ex.: Motorista parceiro',
+                                      prefixIcon: Icon(Icons.sell_outlined))),
+                              const SizedBox(height: 20),
+                              _AdminColorPicker(
+                                  initialColor: color,
+                                  onChanged: (next) => color = next),
+                              const SizedBox(height: 20),
+                              Text('ÍCONE DA TAG',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .labelMedium
+                                      ?.copyWith(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .tertiary,
+                                          fontSize: 10)),
                               const SizedBox(height: 8),
-                              Wrap(
-                                  spacing: 10,
-                                  runSpacing: 10,
-                                  children: colors
-                                      .map((item) => InkWell(
-                                          onTap: () =>
-                                              setDialog(() => color = item),
-                                          borderRadius:
-                                              BorderRadius.circular(24),
-                                          child: Container(
-                                              width: 34,
-                                              height: 34,
-                                              decoration: BoxDecoration(
-                                                  color: item,
-                                                  shape: BoxShape.circle,
-                                                  border: Border.all(
-                                                      color: color == item
-                                                          ? Colors.white
-                                                          : Colors.transparent,
-                                                      width: 3)))))
-                                      .toList()),
-                              const SizedBox(height: 18),
-                              OutlinedButton.icon(
+                              _AdminFilePickerButton(
+                                  fileName: icon?.name,
+                                  helper: 'ARQUIVO SVG • VETOR • ATÉ 256 KB',
                                   onPressed: () async {
                                     final result = await FilePicker.platform
                                         .pickFiles(
                                             type: FileType.custom,
                                             allowedExtensions: const ['svg'],
                                             withData: true);
-                                    if (result != null)
+                                    if (result != null) {
                                       setDialog(
                                           () => icon = result.files.single);
+                                    }
                                   },
-                                  icon: const Icon(Icons.attach_file),
-                                  label: Text(icon == null
+                                  label: icon == null
                                       ? 'ANEXAR ÍCONE SVG'
-                                      : 'TROCAR ÍCONE SVG')),
-                              if (icon != null)
-                                Padding(
-                                    padding: const EdgeInsets.only(top: 8),
-                                    child: Text(icon!.name,
-                                        style: const TextStyle(
-                                            fontWeight: FontWeight.bold)))
-                            ])),
+                                      : 'TROCAR ÍCONE SVG')
+                            ]))),
                     actions: [
                       TextButton(
                           onPressed: () => Navigator.pop(context, false),
-                          child: const Text('Cancelar')),
+                          child: const Text('CANCELAR')),
                       FilledButton(
-                          onPressed: icon == null
+                          onPressed: icon == null || name.text.trim().isEmpty
                               ? null
                               : () => Navigator.pop(context, true),
-                          child: const Text('Salvar'))
+                          child: const Text('CRIAR TAG'))
                     ])));
-    if (ok == true && icon?.bytes != null)
-      try {
-        final svg = String.fromCharCodes(icon!.bytes!);
-        await ref.read(dioProvider).post('/admin/tags', data: {
-          'name': name.text.trim(),
-          'color':
-              '#${color.toARGB32().toRadixString(16).substring(2).toUpperCase()}',
-          'iconSvg': svg.trim()
-        });
-        await _refresh();
-      } on DioException catch (e) {
-        _showError(_message(e, 'Não foi possível criar a tag.'));
-      } finally {
-        name.dispose();
-      }
+    if (ok != true || icon?.bytes == null) {
+      await _disposeControllersAfterDialog([name]);
+      return;
+    }
+    try {
+      final svg = String.fromCharCodes(icon!.bytes!);
+      await ref.read(dioProvider).post('/admin/tags', data: {
+        'name': name.text.trim(),
+        'color': _hexColor(color),
+        'iconSvg': svg.trim()
+      });
+      await _refresh();
+    } on DioException catch (e) {
+      _showError(_message(e, 'Não foi possível criar a tag.'));
+    } finally {
+      await _disposeControllersAfterDialog([name]);
+    }
   }
 
   Future<void> _sendNewsletter(Map user) async {
@@ -593,44 +681,73 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
     }
   }
 
-  Future<void> _adminChatDialog(Map user, String conversationId) async {
-    final message = TextEditingController();
-    /*
-    await showDialog<void>(context: context, builder: (context) => StatefulBuilder(builder: (context, setDialogState) { Future<List<dynamic>> load() async => (await ref.read(dioProvider).get('/admin/conversations/$conversationId/messages')).data as List<dynamic>; return AlertDialog(title: Text('Chat admin • ${user['fullName']}'), content: SizedBox(width: 520, height: 440, child: FutureBuilder<List<dynamic>>(future: load(), builder: (context, snapshot) => Column(children: [Expanded(child: snapshot.hasData ? ListView(children: snapshot.data!.map((m) => Align(alignment: m['fromAdmin'] == true ? Alignment.centerRight : Alignment.centerLeft, child: Container(margin: const EdgeInsets.symmetric(vertical: 4), padding: const EdgeInsets.all(9), color: m['fromAdmin'] == true ? Theme.of(context).colorScheme.primaryContainer : Theme.of(context).colorScheme.surfaceContainerHighest, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(m['fromAdmin'] == true ? 'ADMIN • ${m['sender']}' : m['sender'].toString(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)), Text(m['body']?.toString() ?? '')]))).toList()) : const Center(child: CircularProgressIndicator())), Row(children: [Expanded(child: TextField(controller: message, decoration: const InputDecoration(hintText: 'Responder como admin'))), IconButton(icon: const Icon(Icons.send), onPressed: () async { if (message.text.trim().isEmpty) return; try { await ref.read(dioProvider).post('/admin/conversations/$conversationId/messages', data: {'body': message.text.trim()}); message.clear(); setDialogState(() {}); } on DioException catch (e) { _showError(_message(e, 'Não foi possível enviar a mensagem.')); } })])])), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('FECHAR'))]); })); message.dispose();
-    */
-    message.dispose();
-  }
-
-  Future<void> _adminChatDialog2(Map user, String conversationId) async {
-    final message = TextEditingController();
-    /*
-    var refresh = 0;
-    await showDialog<void>(context: context, builder: (context) => StatefulBuilder(builder: (context, setDialogState) => AlertDialog(title: Text('Chat admin • ${user['fullName']}'), content: SizedBox(width: 520, height: 440, child: Column(children: [Expanded(child: FutureBuilder<List<dynamic>>(key: ValueKey(refresh), future: _loadAdminMessages(conversationId), builder: (context, snapshot) { if (!snapshot.hasData) return const Center(child: CircularProgressIndicator()); return ListView(children: snapshot.data!.map((m) => Align(alignment: m['fromAdmin'] == true ? Alignment.centerRight : Alignment.centerLeft, child: Container(margin: const EdgeInsets.symmetric(vertical: 4), padding: const EdgeInsets.all(9), color: m['fromAdmin'] == true ? Theme.of(context).colorScheme.primaryContainer : Theme.of(context).colorScheme.surfaceContainerHighest, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(m['fromAdmin'] == true ? 'ADMIN • ${m['sender']}' : m['sender'].toString(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)), Text(m['body']?.toString() ?? '')]))).toList()); })), Row(children: [Expanded(child: TextField(controller: message, decoration: const InputDecoration(hintText: 'Responder como admin'))), IconButton(icon: const Icon(Icons.send), onPressed: () async { if (message.text.trim().isEmpty) return; try { await ref.read(dioProvider).post('/admin/conversations/$conversationId/messages', data: {'body': message.text.trim()}); message.clear(); setDialogState(() => refresh++); } on DioException catch (e) { _showError(_message(e, 'Não foi possível enviar a mensagem.')); } })])])), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('FECHAR'))])));
-    message.dispose();
-    */
-  }
-
   Future<void> _adminChatDialog3(Map user, String conversationId) async {
     final message = TextEditingController();
     var refresh = 0;
+    var sending = false;
+    String? sendError;
     await _showAdminDialog<void>(
         context: context,
         builder: (context) => StatefulBuilder(
             builder: (context, setDialogState) => AlertDialog(
-                    title: Text('Chat admin • ${user['fullName']}'),
+                    title: _AdminDialogTitle(
+                        icon: Icons.forum_outlined,
+                        code: 'VJ//ADMIN_CHANNEL',
+                        title:
+                            'CHAT • ${(user['fullName'] ?? 'PESSOA').toString().toUpperCase()}'),
                     content: SizedBox(
-                        width: 520,
-                        height: 440,
+                        width: 620,
+                        height: 510,
                         child: Column(children: [
+                          Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(11),
+                              decoration: BoxDecoration(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .secondary
+                                      .withValues(alpha: .14),
+                                  border: Border.all(
+                                      color: Theme.of(context).colorScheme.ink,
+                                      width: 2)),
+                              child: Row(children: [
+                                Icon(Icons.shield_outlined,
+                                    color:
+                                        Theme.of(context).colorScheme.secondary,
+                                    size: 19),
+                                const SizedBox(width: 10),
+                                const Expanded(
+                                    child: Text(
+                                        'CANAL OFICIAL • MENSAGENS PERMANENTES • HISTÓRICO AUDITÁVEL',
+                                        style: TextStyle(
+                                            fontFamily: 'IBMPlexMono',
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 9)))
+                              ])),
+                          const SizedBox(height: 12),
                           Expanded(
                               child: FutureBuilder<List<dynamic>>(
                                   key: ValueKey(refresh),
                                   future: _loadAdminMessages(conversationId),
                                   builder: (context, snapshot) {
+                                    if (snapshot.hasError) {
+                                      return Center(
+                                          child: Text(
+                                              'Não foi possível carregar o histórico.',
+                                              style: TextStyle(
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .error,
+                                                  fontWeight:
+                                                      FontWeight.w700)));
+                                    }
                                     if (!snapshot.hasData) {
                                       return const Center(
                                           child: NeoLoadingIndicator(
                                               label: 'CARREGANDO CONVERSA'));
+                                    }
+                                    if (snapshot.data!.isEmpty) {
+                                      return const _AdminChatEmptyState();
                                     }
                                     return ListView(
                                         padding:
@@ -639,36 +756,74 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
                                             .map(_adminChatBubble)
                                             .toList());
                                   })),
+                          if (sendError != null)
+                            Container(
+                                width: double.infinity,
+                                margin: const EdgeInsets.only(bottom: 10),
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .error
+                                        .withValues(alpha: .12),
+                                    border: Border.all(
+                                        color:
+                                            Theme.of(context).colorScheme.error,
+                                        width: 2)),
+                                child: Text(sendError!,
+                                    style: TextStyle(
+                                        color:
+                                            Theme.of(context).colorScheme.error,
+                                        fontWeight: FontWeight.w700))),
                           const SizedBox(height: 12),
                           Row(children: [
                             Expanded(
                                 child: TextField(
                                     controller: message,
+                                    enabled: !sending,
                                     decoration: const InputDecoration(
-                                        hintText: 'Responder como admin',
+                                        labelText: 'Mensagem administrativa',
+                                        hintText:
+                                            'Escreva uma orientação clara',
                                         prefixIcon:
                                             Icon(Icons.chat_bubble_outline)))),
                             const SizedBox(width: 10),
-                            SizedBox(
-                                width: 56,
-                                child: NeoButton(
-                                    height: 52,
-                                    onPressed: () async {
-                                      if (message.text.trim().isEmpty) return;
-                                      try {
-                                        await ref.read(dioProvider).post(
-                                            '/admin/conversations/$conversationId/messages',
-                                            data: {
-                                              'body': message.text.trim()
-                                            });
-                                        message.clear();
-                                        setDialogState(() => refresh++);
-                                      } on DioException catch (e) {
-                                        _showError(_message(e,
-                                            'Não foi possível enviar a mensagem.'));
-                                      }
-                                    },
-                                    child: const Icon(Icons.send)))
+                            _AdminSquareButton(
+                                icon: Icons.send,
+                                tooltip: 'Enviar mensagem',
+                                primary: true,
+                                loading: sending,
+                                onPressed: sending
+                                    ? null
+                                    : () async {
+                                        if (message.text.trim().isEmpty) {
+                                          setDialogState(() => sendError =
+                                              'Escreva uma mensagem antes de enviar.');
+                                          return;
+                                        }
+                                        setDialogState(() {
+                                          sending = true;
+                                          sendError = null;
+                                        });
+                                        try {
+                                          await ref.read(dioProvider).post(
+                                              '/admin/conversations/$conversationId/messages',
+                                              data: {
+                                                'body': message.text.trim()
+                                              });
+                                          message.clear();
+                                          setDialogState(() => refresh++);
+                                        } on DioException catch (e) {
+                                          setDialogState(() => sendError = _message(
+                                              e,
+                                              'Não foi possível enviar a mensagem.'));
+                                        } finally {
+                                          if (context.mounted) {
+                                            setDialogState(
+                                                () => sending = false);
+                                          }
+                                        }
+                                      })
                           ])
                         ])),
                     actions: [
@@ -676,7 +831,7 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
                           onPressed: () => Navigator.pop(context),
                           child: const Text('FECHAR'))
                     ])));
-    message.dispose();
+    await _disposeControllersAfterDialog([message]);
   }
 
   Widget _adminChatBubble(dynamic m) {
@@ -717,17 +872,36 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
   Future<void> _personActions(Map user) async => _showAdminDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-              title: Text(user['fullName']?.toString() ?? 'Pessoa'),
+              title:
+                  _AdminDialogTitle(
+                      icon: Icons.person_outline,
+                      code: 'VJ//PERSON_ACTIONS',
+                      title: user['fullName']?.toString().toUpperCase() ??
+                          'PESSOA'),
               content: SizedBox(
-                  width: 460,
+                  width: 500,
                   child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(user['email']?.toString() ?? '',
-                            style: TextStyle(
-                                color:
-                                    Theme.of(context).colorScheme.secondary))),
-                    const SizedBox(height: 8),
+                    Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest,
+                            border: Border.all(
+                                color: Theme.of(context).colorScheme.ink,
+                                width: 2)),
+                        child: Row(children: [
+                          Icon(Icons.alternate_email,
+                              color: Theme.of(context).colorScheme.tertiary,
+                              size: 18),
+                          const SizedBox(width: 10),
+                          Expanded(
+                              child: Text(user['email']?.toString() ?? '',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w700)))
+                        ])),
+                    const SizedBox(height: 12),
                     const Align(
                         alignment: Alignment.centerLeft,
                         child: Text(
@@ -759,31 +933,51 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
               actions: [
                 TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child: const Text('Fechar'))
+                    child: const Text('FECHAR'))
               ]));
 
   Widget _personActionButton(IconData icon, String title, String description,
           VoidCallback onTap) =>
       Padding(
           padding: const EdgeInsets.only(bottom: 10),
-          child: OutlinedButton(
-              onPressed: onTap,
-              style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.all(14),
-                  alignment: Alignment.centerLeft),
-              child: Row(children: [
-                Icon(icon),
-                const SizedBox(width: 12),
-                Expanded(
-                    child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                      Text(title,
-                          style: const TextStyle(fontWeight: FontWeight.w800)),
-                      const SizedBox(height: 2),
-                      Text(description, style: const TextStyle(fontSize: 12))
-                    ]))
-              ])));
+          child: Material(
+              color: Theme.of(context).colorScheme.surface,
+              child: InkWell(
+                  onTap: onTap,
+                  child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                          border: Border.all(
+                              color: Theme.of(context).colorScheme.ink,
+                              width: 2),
+                          borderRadius:
+                              BorderRadius.circular(NeoBrutal.borderRadius)),
+                      child: Row(children: [
+                        Container(
+                            width: 38,
+                            height: 38,
+                            alignment: Alignment.center,
+                            color: Theme.of(context).colorScheme.primary,
+                            child: Icon(icon, color: Colors.white, size: 20)),
+                        const SizedBox(width: 12),
+                        Expanded(
+                            child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                              Text(title.toUpperCase(),
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 13)),
+                              const SizedBox(height: 3),
+                              Text(description,
+                                  style: TextStyle(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
+                                      fontSize: 12))
+                            ])),
+                        const Icon(Icons.arrow_forward, size: 18)
+                      ])))));
 
   Future<void> _createAdmin() async {
     final email = TextEditingController();
@@ -1139,7 +1333,15 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
         height: 46,
         color: selected ? scheme.secondary : scheme.surface,
         foregroundColor: selected ? Colors.white : scheme.ink,
-        icon: Icon(meta.icon),
+        icon: Container(
+            width: 28,
+            height: 28,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+                color: selected ? Colors.white : scheme.secondary,
+                border: Border.all(color: scheme.ink, width: 2)),
+            child: Icon(meta.icon,
+                color: selected ? scheme.secondary : Colors.white, size: 17)),
         trailing: Text('${meta.count}',
             style: TextStyle(
                 color: selected ? Colors.white : scheme.onSurfaceVariant,
@@ -1172,12 +1374,10 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
           SizedBox(width: compact ? 156 : 190, child: action)
         ],
         const SizedBox(width: 12),
-        SizedBox(
-            width: 52,
-            child: NeoOutlineButton(
-                height: 48,
-                onPressed: _loading ? null : _refresh,
-                child: const Icon(Icons.refresh)))
+        _AdminSquareButton(
+            icon: Icons.refresh,
+            tooltip: 'Atualizar dados',
+            onPressed: _loading ? null : _refresh)
       ]),
       if (_section == _AdminSection.people) ...[
         const SizedBox(height: 18),
@@ -1241,17 +1441,18 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
     return switch (_section) {
       _AdminSection.stickers when canManage => NeoButton(
           height: 48,
-          icon: const Icon(Icons.add_photo_alternate_outlined),
+          icon:
+              const _AdminActionIcon(icon: Icons.add_photo_alternate_outlined),
           onPressed: _createStickerWithAsset,
           child: const Text('NOVA FIGURINHA')),
       _AdminSection.tags when canManage => NeoButton(
           height: 48,
-          icon: const Icon(Icons.add),
+          icon: const _AdminActionIcon(icon: Icons.add),
           onPressed: _createTagWithFile,
           child: const Text('NOVA TAG')),
       _AdminSection.accounts when _superAdmin => NeoButton(
           height: 48,
-          icon: const Icon(Icons.person_add_alt_1_outlined),
+          icon: const _AdminActionIcon(icon: Icons.person_add_alt_1_outlined),
           onPressed: _createAdmin,
           child: const Text('NOVO ACESSO')),
       _ => null
@@ -1333,8 +1534,11 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
                             width: 36,
                             height: 36,
                             alignment: Alignment.center,
-                            color: scheme.secondary.withValues(alpha: .14),
-                            child: Icon(icon, size: 20)),
+                            decoration: BoxDecoration(
+                                color: scheme.secondary,
+                                border:
+                                    Border.all(color: scheme.ink, width: 2)),
+                            child: Icon(icon, size: 20, color: Colors.white)),
                     const SizedBox(width: 14),
                     Expanded(
                         child: Column(
@@ -1373,7 +1577,7 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
             borderRadius: BorderRadius.circular(999)),
         child: Text(label,
             style: TextStyle(
-                color: NeoBrutal.inkLight,
+                color: positive ? NeoBrutal.inkLight : scheme.ink,
                 fontFamily: 'IBMPlexMono',
                 fontWeight: FontWeight.w700,
                 fontSize: 9)));
@@ -1506,6 +1710,370 @@ class _AdminRouteLine extends StatelessWidget {
   Widget _line() => Container(height: 2, color: color.withValues(alpha: .65));
 }
 
+class _AdminActionIcon extends StatelessWidget {
+  const _AdminActionIcon({required this.icon});
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) => Container(
+      width: 28,
+      height: 28,
+      alignment: Alignment.center,
+      color: Colors.white,
+      child:
+          Icon(icon, color: Theme.of(context).colorScheme.primary, size: 18));
+}
+
+class _AdminSquareButton extends StatefulWidget {
+  const _AdminSquareButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+    this.primary = false,
+    this.loading = false,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onPressed;
+  final bool primary;
+  final bool loading;
+
+  @override
+  State<_AdminSquareButton> createState() => _AdminSquareButtonState();
+}
+
+class _AdminSquareButtonState extends State<_AdminSquareButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final enabled = widget.onPressed != null;
+    final background = widget.primary ? scheme.primary : scheme.surface;
+    final foreground = widget.primary ? Colors.white : scheme.ink;
+    return Tooltip(
+        message: widget.tooltip,
+        child: Semantics(
+            button: true,
+            label: widget.tooltip,
+            enabled: enabled,
+            child: GestureDetector(
+                onTapDown:
+                    enabled ? (_) => setState(() => _pressed = true) : null,
+                onTapUp:
+                    enabled ? (_) => setState(() => _pressed = false) : null,
+                onTapCancel:
+                    enabled ? () => setState(() => _pressed = false) : null,
+                onTap: widget.onPressed,
+                child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 70),
+                    width: 52,
+                    height: 48,
+                    margin: EdgeInsets.only(
+                        left: _pressed ? NeoBrutal.shadowOffset.dx : 0,
+                        top: _pressed ? NeoBrutal.shadowOffset.dy : 0),
+                    decoration: NeoBrutal.decoration(
+                        color: enabled
+                            ? background
+                            : background.withValues(alpha: .45),
+                        borderColor: scheme.ink,
+                        pressed: _pressed),
+                    child: Icon(widget.loading ? Icons.more_horiz : widget.icon,
+                        color: foreground, size: 22)))));
+  }
+}
+
+class _AdminDialogTitle extends StatelessWidget {
+  const _AdminDialogTitle(
+      {required this.icon, required this.code, required this.title});
+
+  final IconData icon;
+  final String code;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Container(
+          width: 44,
+          height: 44,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+              color: scheme.secondary,
+              border: Border.all(color: scheme.ink, width: 2)),
+          child: Icon(icon, color: Colors.white, size: 23)),
+      const SizedBox(width: 14),
+      Expanded(
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(code,
+            style: TextStyle(
+                color: scheme.tertiary,
+                fontFamily: 'IBMPlexMono',
+                fontWeight: FontWeight.w700,
+                fontSize: 9,
+                letterSpacing: .7)),
+        const SizedBox(height: 4),
+        Text(title,
+            style: Theme.of(context)
+                .textTheme
+                .titleLarge
+                ?.copyWith(fontSize: 21, fontWeight: FontWeight.w900))
+      ]))
+    ]);
+  }
+}
+
+class _AdminFilePickerButton extends StatelessWidget {
+  const _AdminFilePickerButton({
+    required this.label,
+    required this.helper,
+    required this.onPressed,
+    this.fileName,
+  });
+
+  final String label;
+  final String helper;
+  final String? fileName;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+        color: Colors.transparent,
+        child: InkWell(
+            onTap: onPressed,
+            child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: NeoBrutal.decoration(
+                    color: scheme.surfaceContainerHighest,
+                    borderColor: scheme.ink,
+                    offset: NeoBrutal.shadowOffsetSmall),
+                child: Row(children: [
+                  Container(
+                      width: 42,
+                      height: 42,
+                      alignment: Alignment.center,
+                      color: scheme.primary,
+                      child: const Icon(Icons.upload_file_outlined,
+                          color: Colors.white, size: 23)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                        Text(label,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w900, fontSize: 13)),
+                        const SizedBox(height: 3),
+                        Text(fileName ?? helper,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                color: fileName == null
+                                    ? scheme.onSurfaceVariant
+                                    : scheme.tertiary,
+                                fontFamily: 'IBMPlexMono',
+                                fontWeight: FontWeight.w700,
+                                fontSize: 9))
+                      ])),
+                  const SizedBox(width: 10),
+                  const Icon(Icons.arrow_forward, size: 19)
+                ]))));
+  }
+}
+
+class _AdminColorPicker extends StatefulWidget {
+  const _AdminColorPicker(
+      {required this.initialColor, required this.onChanged});
+  final Color initialColor;
+  final ValueChanged<Color> onChanged;
+
+  @override
+  State<_AdminColorPicker> createState() => _AdminColorPickerState();
+}
+
+class _AdminColorPickerState extends State<_AdminColorPicker> {
+  static const _presets = [
+    Color(0xFF00B8D9),
+    Color(0xFFD91568),
+    Color(0xFF9C27B0),
+    Color(0xFF5146D8),
+    Color(0xFF3F51B5),
+    Color(0xFF009688),
+    Color(0xFF4CAF50),
+    Color(0xFFFF9800),
+    Color(0xFFFF3B3B),
+    Color(0xFF795548),
+    Color(0xFF607D8B),
+    Color(0xFF111827),
+  ];
+
+  late Color _selected = widget.initialColor;
+  late final TextEditingController _hex =
+      TextEditingController(text: _hexColor(widget.initialColor));
+  bool _showCustom = false;
+
+  @override
+  void dispose() {
+    _hex.dispose();
+    super.dispose();
+  }
+
+  void _select(Color color, {bool syncText = true}) {
+    setState(() {
+      _selected = color;
+      if (syncText) _hex.text = _hexColor(color);
+    });
+    widget.onChanged(color);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('COR DA TAG',
+          style: Theme.of(context)
+              .textTheme
+              .labelMedium
+              ?.copyWith(color: scheme.tertiary, fontSize: 10)),
+      const SizedBox(height: 4),
+      Text('Escolha uma cor pronta ou crie a sua.',
+          style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12)),
+      const SizedBox(height: 10),
+      Wrap(spacing: 9, runSpacing: 9, children: [
+        ..._presets.map((color) => _colorTile(color)),
+        Tooltip(
+            message: 'Criar cor personalizada',
+            child: InkWell(
+                onTap: () => setState(() => _showCustom = !_showCustom),
+                child: Container(
+                    width: 36,
+                    height: 36,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                        color: _showCustom ? scheme.primary : scheme.surface,
+                        border: Border.all(color: scheme.ink, width: 2)),
+                    child: Icon(Icons.add,
+                        color: _showCustom ? Colors.white : scheme.ink,
+                        size: 21))))
+      ]),
+      if (_showCustom) ...[
+        const SizedBox(height: 14),
+        Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+                color: scheme.surfaceContainerHighest,
+                border: Border.all(color: scheme.ink, width: 2)),
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('COR PERSONALIZADA',
+                  style: Theme.of(context)
+                      .textTheme
+                      .labelMedium
+                      ?.copyWith(color: scheme.tertiary, fontSize: 9)),
+              const SizedBox(height: 10),
+              Row(children: [
+                Container(
+                    width: 54,
+                    height: 54,
+                    decoration: BoxDecoration(
+                        color: _selected,
+                        border: Border.all(color: scheme.ink, width: 3))),
+                const SizedBox(width: 12),
+                Expanded(
+                    child: TextField(
+                        controller: _hex,
+                        maxLength: 7,
+                        textCapitalization: TextCapitalization.characters,
+                        decoration: const InputDecoration(
+                            labelText: 'Código hexadecimal',
+                            hintText: '#00B8D9',
+                            counterText: '',
+                            prefixIcon: Icon(Icons.tag)),
+                        onChanged: (value) {
+                          final parsed = _tryParseHex(value);
+                          if (parsed != null) _select(parsed, syncText: false);
+                        }))
+              ]),
+              const SizedBox(height: 12),
+              Text('SELETOR VISUAL',
+                  style: Theme.of(context)
+                      .textTheme
+                      .labelMedium
+                      ?.copyWith(color: scheme.tertiary, fontSize: 9)),
+              const SizedBox(height: 8),
+              Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: List.generate(36, (index) {
+                    final row = index ~/ 12;
+                    final hue = (index % 12) * 30.0;
+                    final saturation = [0.85, 0.65, 0.45][row];
+                    final value = [0.95, 0.78, 0.62][row];
+                    return _colorTile(
+                        HSVColor.fromAHSV(1, hue, saturation, value).toColor());
+                  }))
+            ]))
+      ]
+    ]);
+  }
+
+  Widget _colorTile(Color color) {
+    final scheme = Theme.of(context).colorScheme;
+    final selected = color.toARGB32() == _selected.toARGB32();
+    return Semantics(
+        button: true,
+        selected: selected,
+        label: 'Cor ${_hexColor(color)}',
+        child: InkWell(
+            onTap: () => _select(color),
+            child: Container(
+                width: 36,
+                height: 36,
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                    color: selected ? scheme.ink : Colors.transparent,
+                    border: Border.all(color: scheme.ink, width: 2)),
+                child: Container(
+                    decoration: BoxDecoration(
+                        color: color,
+                        border: Border.all(
+                            color: selected ? Colors.white : color,
+                            width: 2))))));
+  }
+}
+
+class _AdminChatEmptyState extends StatelessWidget {
+  const _AdminChatEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Center(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+      Container(
+          width: 48,
+          height: 48,
+          alignment: Alignment.center,
+          color: scheme.secondary,
+          child: const Icon(Icons.mark_chat_unread_outlined,
+              color: Colors.white, size: 25)),
+      const SizedBox(height: 12),
+      const Text('CONVERSA AINDA VAZIA',
+          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+      const SizedBox(height: 5),
+      Text('Envie a primeira orientação para esta pessoa.',
+          style: TextStyle(color: scheme.onSurfaceVariant))
+    ]));
+  }
+}
+
 Future<T?> _showAdminDialog<T>({
   required BuildContext context,
   required WidgetBuilder builder,
@@ -1548,40 +2116,10 @@ Future<T?> _showAdminDialog<T>({
                       color: scheme.ink, width: NeoBrutal.borderWidth)))));
   return showDialog<T>(
       context: context,
-      barrierColor: NeoBrutal.inkLight.withValues(alpha: .68),
+      barrierColor: Colors.black.withValues(alpha: .82),
       barrierDismissible: barrierDismissible,
-      builder: (dialogContext) => Theme(
-          data: dialogTheme,
-          child: Stack(children: [
-            Positioned.fill(
-                child: IgnorePointer(
-                    child: CustomPaint(
-                        painter: _AdminDialogBackdropPainter(
-                            color: scheme.tertiary)))),
-            builder(dialogContext)
-          ])));
-}
-
-class _AdminDialogBackdropPainter extends CustomPainter {
-  const _AdminDialogBackdropPainter({required this.color});
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color.withValues(alpha: .18)
-      ..strokeWidth = 1.5;
-    for (var x = 0.0; x < size.width; x += 48) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
-    }
-    for (var y = 0.0; y < size.height; y += 48) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _AdminDialogBackdropPainter oldDelegate) =>
-      oldDelegate.color != color;
+      builder: (dialogContext) =>
+          Theme(data: dialogTheme, child: builder(dialogContext)));
 }
 
 String _message(DioException error, String fallback) {
@@ -1593,3 +2131,20 @@ String _message(DioException error, String fallback) {
 
 Color _tagColor(String? value) =>
     Color(int.parse((value ?? '#666666').replaceFirst('#', 'FF'), radix: 16));
+
+String _hexColor(Color color) =>
+    '#${color.toARGB32().toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
+
+Color? _tryParseHex(String value) {
+  final normalized = value.trim().replaceFirst('#', '');
+  if (!RegExp(r'^[0-9a-fA-F]{6}$').hasMatch(normalized)) return null;
+  return Color(int.parse('FF$normalized', radix: 16));
+}
+
+Future<void> _disposeControllersAfterDialog(
+    List<TextEditingController> controllers) async {
+  await Future<void>.delayed(const Duration(milliseconds: 250));
+  for (final controller in controllers) {
+    controller.dispose();
+  }
+}

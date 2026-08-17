@@ -24,6 +24,7 @@ from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 HERE = Path(__file__).resolve().parent
 MOBILE = HERE.parent.parent
 RES = MOBILE / "android" / "app" / "src" / "main" / "res"
+WEB_FAVICON = MOBILE / "web" / "favicon.png"
 MASTER = HERE / "app_icon_master.png"
 MARK_CACHE = HERE / "app_icon_mark.png"
 
@@ -191,6 +192,16 @@ def make_icons():
         "circle": compose(circle_mask(), 470, (455, 435)),
         "teardrop": compose(teardrop_mask(), 440, (455, 495)),
     }
+
+
+def write_web_favicon(icon):
+    """Gera um favicon com a marca grande o bastante para leitura a 16 px."""
+    artwork = icon.crop(icon.getchannel("A").getbbox())
+    artwork.thumbnail((62, 62), Image.Resampling.LANCZOS)
+    favicon = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+    position = ((64 - artwork.width) // 2, (64 - artwork.height) // 2)
+    favicon.alpha_composite(artwork, position)
+    favicon.save(WEB_FAVICON, optimize=True)
 
 
 # --------------------------------------------------------------------------
@@ -404,11 +415,13 @@ def main():
     icons = make_icons()
     for kind, icon in icons.items():
         icon.save(HERE / f"app_icon_{kind}.png", optimize=True)
+    write_web_favicon(icons["squircle"])
     # `app_icon_master.png` fica intocado: e a fonte da marca, nao uma saida.
     removed = write_android_layers()
     render_contact_sheet(icons)
     render_adaptive_preview()
     print("pranchas:", ", ".join(icons))
+    print("favicon web: favicon.png")
     print("camadas android: ic_launcher_foreground, ic_launcher_monochrome, "
           "ic_launcher, ic_launcher_round")
     if removed:
