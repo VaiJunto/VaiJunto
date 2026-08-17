@@ -29,7 +29,8 @@ class MediaStorageServiceTest {
         ObjectProvider<S3Client> clients = org.mockito.Mockito.mock(ObjectProvider.class);
         ObjectProvider<S3Presigner> presigners = org.mockito.Mockito.mock(ObjectProvider.class);
         MediaStorageService service = new MediaStorageService(
-                new R2Properties("", "", "auto", "", "", 30), clients, presigners, media, users, conversations);
+                new R2Properties("", "", "auto", "", "", 30), clients, presigners, media, users, conversations,
+                org.mockito.Mockito.mock(com.vaijunto.repository.AdminAccountRepository.class));
         User stranger = User.builder().id(UUID.randomUUID()).email("other@fatec.sp.gov.br").build();
         User owner = User.builder().id(UUID.randomUUID()).email("owner@fatec.sp.gov.br").build();
         UUID mediaId = UUID.randomUUID();
@@ -49,7 +50,8 @@ class MediaStorageServiceTest {
         ObjectProvider<S3Client> clients = org.mockito.Mockito.mock(ObjectProvider.class);
         ObjectProvider<S3Presigner> presigners = org.mockito.Mockito.mock(ObjectProvider.class);
         MediaStorageService service = new MediaStorageService(
-                new R2Properties("", "", "auto", "", "", 30), clients, presigners, media, users, conversations);
+                new R2Properties("", "", "auto", "", "", 30), clients, presigners, media, users, conversations,
+                org.mockito.Mockito.mock(com.vaijunto.repository.AdminAccountRepository.class));
         MediaObject scheduledChat = MediaObject.builder().id(UUID.randomUUID()).status("ACTIVE")
                 .category("CHAT").sizeBytes(1024L).build();
         long thirtyGb = 30L * 1024L * 1024L * 1024L;

@@ -34,6 +34,15 @@ public class User {
     @Column
     private String course;
 
+    /**
+     * Vínculo com a instituição (STUDENT, PROFESSOR, STAFF). Eixo independente
+     * de {@link #profileTypes}: um professor também pode ser motorista. Fica
+     * nulo até existir o cadastro que preenche isso — a segmentação de
+     * newsletter já filtra por ele.
+     */
+    @Column
+    private String affiliation;
+
     @Column(name = "photo_url")
     private String photoUrl;
 

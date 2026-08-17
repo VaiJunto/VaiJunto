@@ -34,7 +34,10 @@ public class Notification {
     @Column(columnDefinition = "text")
     private String body;
 
+    // Ver ConversationMessage.locationJson: String vai como varchar e o Postgres
+    // recusa gravar em coluna jsonb sem cast explícito.
     @Column(columnDefinition = "jsonb")
+    @org.hibernate.annotations.ColumnTransformer(write = "cast(? as jsonb)")
     private String payload;
 
     @Column(name = "is_read", nullable = false)

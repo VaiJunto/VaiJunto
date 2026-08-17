@@ -144,6 +144,23 @@ de rota usa `ColorScheme.ink`.
 - Nunca usar scanline sobre texto, glitch contínuo, ruído aleatório, glow ou
   partículas. A interface deve parecer viva, não defeituosa.
 
+### Corrida geométrica (só painel administrativo)
+
+- `NeoGeometryRunBackdrop` ocupa o vazio da lista do painel de operações
+  quando há poucos registros. É o único lugar com movimento contínuo grande.
+- O percurso não é um loop: cada obstáculo vem de um hash do índice do bloco,
+  que só cresce. Não há frame de emenda porque nada volta ao início — em 15
+  minutos passam ~2.750 blocos sem repetir trecho.
+- O salto é analítico (janela fixa de decolagem/pouso por obstáculo), então o
+  cubo passa limpo em qualquer taxa de quadros e a pose congelada continua
+  coerente. Nada de física simulada nem de valor aleatório em tempo de execução.
+- Vocabulário: quadrado magenta correndo, picos ciano, blocos de tinta e
+  torres de fundo em parallax. Sem gradiente, sem brilho, sem partícula.
+- Fica sempre atrás: alfa máximo ~0,35, ancorado na base da área, e as linhas
+  da lista permanecem opacas por cima. Título e descrição da seção ficam fora
+  do card, sobre fundo limpo.
+- `MediaQuery.disableAnimations` congela o percurso em um trecho legível.
+
 ### Loading próprio
 
 - Não usar `CircularProgressIndicator` como linguagem principal do produto.
@@ -264,6 +281,8 @@ Reutilizar antes de desenhar algo novo:
 - `NeoFlowHeader` / `NeoRouteReview` — etapas curtas dos fluxos de publicação.
 - `NeoStreetBackdrop` — grid técnico discreto atrás da área autenticada.
 - `NeoAuthBackdrop` — scanner lento e escuro exclusivo da autenticação.
+- `NeoGeometryRunBackdrop` — corrida geométrica infinita atrás da lista do
+  painel administrativo.
 - `AuthVisualShell` — estrutura de confirmação de e-mail e fluxos auxiliares.
 - `NeoLoadingIndicator` / `NeoBootRail` — loading em células e boot da sessão.
 - `NeoBrutal.decoration(...)` — única forma de criar borda+sombra manual.

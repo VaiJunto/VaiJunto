@@ -15,7 +15,12 @@ public class ConversationMessage {
  @Column(name = "client_id", nullable = false) private UUID clientId;
  @Column(nullable = false) private String kind;
  @Column(columnDefinition = "text") private String body;
- @Column(name = "location_json", columnDefinition = "jsonb") private String locationJson;
+ // O driver JDBC manda String como varchar e o Postgres recusa gravar varchar em
+ // coluna jsonb ("column is of type jsonb but expression is of type character
+ // varying"). O cast explícito no write resolve sem trocar o tipo Java.
+ @Column(name = "location_json", columnDefinition = "jsonb")
+ @org.hibernate.annotations.ColumnTransformer(write = "cast(? as jsonb)")
+ private String locationJson;
  @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "reply_to_id") private ConversationMessage replyTo;
  @CreationTimestamp @Column(name = "sent_at", nullable = false, updatable = false) private OffsetDateTime sentAt;
  @Column(name = "delivered_at") private OffsetDateTime deliveredAt;

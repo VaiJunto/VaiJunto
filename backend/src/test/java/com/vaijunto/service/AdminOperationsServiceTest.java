@@ -29,7 +29,7 @@ class AdminOperationsServiceTest {
   private AdminAccount admin;
 
   @BeforeEach void setUp() {
-    service = new AdminOperationsService(admins, audits, users, mock(MessageReportRepository.class), mock(ReportEvidenceSnapshotRepository.class), mock(ChatStickerRepository.class), notifications, conversations, messages, mock(VehicleRepository.class), mock(OfferRepository.class), mock(MediaStorageService.class), mock(AdminUserTagRepository.class), mock(AdminUserTagAssignmentRepository.class));
+    service = new AdminOperationsService(admins, audits, users, mock(MessageReportRepository.class), mock(ReportEvidenceSnapshotRepository.class), mock(ChatStickerRepository.class), notifications, conversations, messages, mock(VehicleRepository.class), mock(OfferRepository.class), mock(MediaStorageService.class), mock(AdminUserTagRepository.class), mock(AdminUserTagAssignmentRepository.class), mock(MediaObjectRepository.class));
     user = User.builder().id(UUID.randomUUID()).name("Ana").fullName("Ana Fatec").email("ana@fatec.sp.gov.br").build();
     admin = AdminAccount.builder().id(UUID.randomUUID()).email("admin@vaijunto.app").role("ADMIN").build();
     when(users.findById(user.getId())).thenReturn(Optional.of(user));
@@ -89,7 +89,7 @@ class AdminOperationsServiceTest {
 
     assertEquals(conversationId,
         service.sendAdminMessage("admin@vaijunto.app", conversationId,
-            "Vamos ajudar você."));
+            "Vamos ajudar você.", List.of()));
     verify(messages).save(argThat(message ->
         "Vamos ajudar você.".equals(message.getBody()) &&
             admin.equals(message.getAdminSender()) &&

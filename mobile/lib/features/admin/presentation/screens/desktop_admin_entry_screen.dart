@@ -10,9 +10,11 @@ import '../../../../core/storage/secure_storage.dart';
 import '../../../../core/theme/neo_brutal_theme.dart';
 import '../../../../core/ui/neo_button.dart';
 import '../../../../core/ui/neo_card.dart';
+import '../../../../core/ui/neo_geometry_run_backdrop.dart';
 import '../../../../core/ui/neo_loading_indicator.dart';
 import '../../../../core/ui/neo_street_backdrop.dart';
 import '../../../auth/presentation/screens/login_screen.dart';
+import '../widgets/newsletter_composer_dialog.dart';
 
 class DesktopAdminEntryScreen extends ConsumerStatefulWidget {
   const DesktopAdminEntryScreen({super.key});
@@ -229,7 +231,7 @@ class _DesktopAdminEntryScreenState
       fontSize: 11);
 }
 
-enum _AdminSection { people, reports, stickers, tags, accounts }
+enum _AdminSection { people, reports, newsletters, stickers, tags, accounts }
 
 class _AdminBuildStamp extends StatelessWidget {
   const _AdminBuildStamp({required this.scheme, this.compact = false});
@@ -282,7 +284,8 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
       _reports = [],
       _stickers = [],
       _tags = [],
-      _accounts = [];
+      _accounts = [],
+      _newsletters = [];
   bool _loading = false;
   String? _error;
   _AdminSection _section = _AdminSection.people;
@@ -314,6 +317,7 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
         dio.get('/admin/reports'),
         dio.get('/admin/stickers'),
         dio.get('/admin/tags'),
+        dio.get('/admin/newsletters'),
         if (_superAdmin) dio.get('/admin/accounts')
       ]);
       if (mounted)
@@ -322,7 +326,8 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
           _reports = responses[1].data as List<dynamic>;
           _stickers = responses[2].data as List<dynamic>;
           _tags = responses[3].data as List<dynamic>;
-          _accounts = _superAdmin ? responses[4].data as List<dynamic> : [];
+          _newsletters = responses[4].data as List<dynamic>;
+          _accounts = _superAdmin ? responses[5].data as List<dynamic> : [];
         });
     } on DioException catch (e) {
       if (mounted)
@@ -627,32 +632,18 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
     }
   }
 
-  Future<void> _sendNewsletter(Map user) async {
-    final title = TextEditingController(text: 'Mensagem do VaiJunto');
-    final body = TextEditingController();
-    final ok = await _formDialog('Newsletter para ${user['fullName']}', [
-      TextField(
-          controller: title,
-          decoration: const InputDecoration(labelText: 'Título')),
-      TextField(
-          controller: body,
-          minLines: 4,
-          maxLines: 7,
-          decoration:
-              const InputDecoration(labelText: 'Mensagem (não respondível)'))
-    ]);
-    if (ok != true) return;
-    try {
-      await ref.read(dioProvider).post('/admin/users/${user['id']}/newsletter',
-          data: {'title': title.text, 'body': body.text});
-      if (mounted)
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Newsletter enviada.')));
-    } on DioException catch (e) {
-      _showError(_message(e, 'Não foi possível enviar a newsletter.'));
-    } finally {
-      title.dispose();
-      body.dispose();
+  /// Abre o compositor de newsletter. [user] apenas pré-seleciona o
+  /// destinatário — o público continua editável lá dentro (grupos, curso, tag,
+  /// equipe administrativa).
+  Future<void> _sendNewsletter([Map? user]) async {
+    final sent = await showNewsletterComposer(
+        context: context,
+        dio: ref.read(dioProvider),
+        tags: _tags,
+        user: user == null ? null : Map<String, dynamic>.from(user));
+    if (sent == true && mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Newsletter enviada.')));
     }
   }
 
@@ -665,7 +656,11 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
                   .map((e) => e['id'].toString())
                   .toSet();
               return AlertDialog(
-                  title: Text('Tags • ${user['fullName']}'),
+                  title: _AdminDialogTitle(
+                      icon: Icons.sell_outlined,
+                      code: 'VJ//PROFILE_LABELS',
+                      title:
+                          'TAGS • ${(user['fullName'] ?? 'PESSOA').toString().toUpperCase()}'),
                   content: SizedBox(
                       width: 420,
                       child: _tags.isEmpty
@@ -676,6 +671,17 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
                                   .map((tag) => CheckboxListTile(
                                       value: assigned
                                           .contains(tag['id'].toString()),
+                                      secondary: Container(
+                                          width: 30,
+                                          height: 30,
+                                          decoration: BoxDecoration(
+                                              color: _tagColor(
+                                                  tag['color']?.toString()),
+                                              border: Border.all(
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .ink,
+                                                  width: 2))),
                                       title: Text(tag['name'].toString()),
                                       subtitle: Text(tag['color'].toString()),
                                       onChanged: (selected) async {
@@ -723,6 +729,8 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
 
   Future<void> _adminChatDialog3(Map user, String conversationId) async {
     final message = TextEditingController();
+    // Anexos já enviados ao R2 e ainda não presos a uma mensagem.
+    final attachments = <Map<String, dynamic>>[];
     var refresh = 0;
     var sending = false;
     String? sendError;
@@ -815,6 +823,25 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
                                         color:
                                             Theme.of(context).colorScheme.error,
                                         fontWeight: FontWeight.w700))),
+                          if (attachments.isNotEmpty)
+                            Align(
+                                alignment: Alignment.centerLeft,
+                                child: Wrap(
+                                    spacing: 8,
+                                    children: attachments
+                                        .map((attachment) => InputChip(
+                                            avatar: const Icon(
+                                                Icons.attachment,
+                                                size: 16),
+                                            label: Text(
+                                                attachment['fileName']
+                                                    .toString(),
+                                                style: const TextStyle(
+                                                    fontSize: 11)),
+                                            onDeleted: () => setDialogState(
+                                                () => attachments
+                                                    .remove(attachment))))
+                                        .toList())),
                           const SizedBox(height: 12),
                           Row(children: [
                             Expanded(
@@ -829,6 +856,19 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
                                             Icon(Icons.chat_bubble_outline)))),
                             const SizedBox(width: 10),
                             _AdminSquareButton(
+                                icon: Icons.attach_file,
+                                tooltip: 'Anexar arquivo',
+                                onPressed: sending
+                                    ? null
+                                    : () async {
+                                        final attachment =
+                                            await _uploadAdminAttachment();
+                                        if (attachment == null) return;
+                                        setDialogState(
+                                            () => attachments.add(attachment));
+                                      }),
+                            const SizedBox(width: 10),
+                            _AdminSquareButton(
                                 icon: Icons.send,
                                 tooltip: 'Enviar mensagem',
                                 primary: true,
@@ -836,7 +876,8 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
                                 onPressed: sending
                                     ? null
                                     : () async {
-                                        if (message.text.trim().isEmpty) {
+                                        if (message.text.trim().isEmpty &&
+                                            attachments.isEmpty) {
                                           setDialogState(() => sendError =
                                               'Escreva uma mensagem antes de enviar.');
                                           return;
@@ -849,10 +890,17 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
                                           await ref.read(dioProvider).post(
                                               '/admin/conversations/$conversationId/messages',
                                               data: {
-                                                'body': message.text.trim()
+                                                'body': message.text.trim(),
+                                                'mediaIds': attachments
+                                                    .map((attachment) =>
+                                                        attachment['mediaId'])
+                                                    .toList()
                                               });
                                           message.clear();
-                                          setDialogState(() => refresh++);
+                                          setDialogState(() {
+                                            attachments.clear();
+                                            refresh++;
+                                          });
                                         } on DioException catch (e) {
                                           setDialogState(() => sendError = _message(
                                               e,
@@ -874,9 +922,33 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
     await _disposeControllersAfterDialog([message]);
   }
 
+  /// Sobe o arquivo já no envio da mensagem: o backend guarda como mídia
+  /// administrativa permanente e só prende à mensagem quando ela é enviada.
+  Future<Map<String, dynamic>?> _uploadAdminAttachment() async {
+    final result = await FilePicker.platform.pickFiles(withData: true);
+    final file = result?.files.firstOrNull;
+    if (file?.bytes == null) return null;
+    try {
+      final response = await ref.read(dioProvider).post('/admin/media',
+          data: FormData.fromMap({
+            'category': 'ADMIN_MESSAGE',
+            'file':
+                MultipartFile.fromBytes(file!.bytes!, filename: file.name)
+          }));
+      return {
+        'mediaId': response.data['mediaId'].toString(),
+        'fileName': file.name
+      };
+    } on DioException catch (e) {
+      _showError(_message(e, 'Não foi possível enviar o anexo.'));
+      return null;
+    }
+  }
+
   Widget _adminChatBubble(dynamic m) {
     final fromAdmin = m['fromAdmin'] == true;
     final scheme = Theme.of(context).colorScheme;
+    final media = (m['media'] as List?) ?? const [];
     return Align(
         alignment: fromAdmin ? Alignment.centerRight : Alignment.centerLeft,
         child: Container(
@@ -899,8 +971,36 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
                       fontSize: 10,
                       fontWeight: FontWeight.w700)),
               const SizedBox(height: 4),
-              Text(m['body']?.toString() ?? '')
+              if ((m['body']?.toString() ?? '').isNotEmpty)
+                Text(m['body'].toString()),
+              for (final attachment in media) ...[
+                const SizedBox(height: 6),
+                _chatAttachment(attachment as Map, scheme)
+              ]
             ])));
+  }
+
+  Widget _chatAttachment(Map attachment, ColorScheme scheme) {
+    final contentType = attachment['contentType']?.toString() ?? '';
+    final url = attachment['url']?.toString() ?? '';
+    if (contentType.startsWith('image/') && url.isNotEmpty) {
+      return ClipRRect(
+          borderRadius: BorderRadius.circular(NeoBrutal.borderRadius),
+          child: Image.network(url, height: 160, fit: BoxFit.cover));
+    }
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(
+          contentType.startsWith('audio/')
+              ? Icons.graphic_eq
+              : contentType.startsWith('video/')
+                  ? Icons.movie_outlined
+                  : Icons.attachment,
+          size: 16,
+          color: scheme.tertiary),
+      const SizedBox(width: 6),
+      Text(contentType.isEmpty ? 'anexo' : contentType,
+          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700))
+    ]);
   }
 
   Future<List<dynamic>> _loadAdminMessages(String conversationId) async =>
@@ -969,6 +1069,23 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
                       Navigator.pop(context);
                       _sendNewsletter(user);
                     }),
+                    if (user['deleted'] == true)
+                      _personActionButton(
+                          Icons.restore_from_trash_outlined,
+                          'Restaurar conta',
+                          'Devolve o acesso desta pessoa ao VaiJunto.', () {
+                        Navigator.pop(context);
+                        _setUserDeleted(user, delete: false);
+                      })
+                    else
+                      _personActionButton(
+                          Icons.person_remove_outlined,
+                          'Excluir conta',
+                          'Exclusão lógica: a pessoa perde o acesso, o histórico é preservado.',
+                          () {
+                        Navigator.pop(context);
+                        _setUserDeleted(user, delete: true);
+                      }, destructive: true),
                   ])),
               actions: [
                 TextButton(
@@ -976,8 +1093,9 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
                     child: const Text('FECHAR'))
               ]));
 
-  Widget _personActionButton(IconData icon, String title, String description,
-          VoidCallback onTap) =>
+  Widget _personActionButton(
+          IconData icon, String title, String description, VoidCallback onTap,
+          {bool destructive = false}) =>
       Padding(
           padding: const EdgeInsets.only(bottom: 10),
           child: Material(
@@ -988,7 +1106,9 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                           border: Border.all(
-                              color: Theme.of(context).colorScheme.ink,
+                              color: destructive
+                                  ? Theme.of(context).colorScheme.error
+                                  : Theme.of(context).colorScheme.ink,
                               width: 2),
                           borderRadius:
                               BorderRadius.circular(NeoBrutal.borderRadius)),
@@ -997,7 +1117,9 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
                             width: 38,
                             height: 38,
                             alignment: Alignment.center,
-                            color: Theme.of(context).colorScheme.primary,
+                            color: destructive
+                                ? Theme.of(context).colorScheme.error
+                                : Theme.of(context).colorScheme.primary,
                             child: Icon(icon, color: Colors.white, size: 20)),
                         const SizedBox(width: 12),
                         Expanded(
@@ -1019,184 +1141,594 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
                         const Icon(Icons.arrow_forward, size: 18)
                       ])))));
 
+  /// Exclusão lógica da conta de uma pessoa da comunidade (e o desfazer dela).
+  ///
+  /// Nada é apagado no banco: a conta perde o login e fica marcada como
+  /// excluída, porque caronas, denúncias e mensagens antigas continuam
+  /// apontando para ela.
+  Future<void> _setUserDeleted(Map user, {required bool delete}) async {
+    final reason = TextEditingController();
+    final name = user['fullName']?.toString() ?? 'esta pessoa';
+    final confirmed = await _confirmDialog(
+        icon: delete
+            ? Icons.person_remove_outlined
+            : Icons.restore_from_trash_outlined,
+        code: delete ? 'VJ//ACCOUNT_SOFT_DELETE' : 'VJ//ACCOUNT_RESTORE',
+        title: delete ? 'EXCLUIR CONTA' : 'RESTAURAR CONTA',
+        message: delete
+            ? '$name perde o acesso ao VaiJunto imediatamente. O histórico é preservado e a conta pode ser restaurada depois.'
+            : '$name volta a conseguir entrar no VaiJunto.',
+        confirmLabel: delete ? 'EXCLUIR CONTA' : 'RESTAURAR',
+        destructive: delete,
+        reason: delete ? reason : null);
+    if (confirmed != true) {
+      await _disposeControllersAfterDialog([reason]);
+      return;
+    }
+    try {
+      final response = await ref
+          .read(dioProvider)
+          .post('/admin/users/${user['id']}/deletion', data: {
+        'action': delete ? 'DELETE' : 'RESTORE',
+        'reason': reason.text.trim()
+      });
+      if (mounted) {
+        final updated = response.data as Map;
+        setState(() => user.addAll(updated));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(delete
+                ? 'Conta de $name excluída.'
+                : 'Conta de $name restaurada.')));
+      }
+      await _refresh();
+    } on DioException catch (e) {
+      _showError(_message(
+          e,
+          delete
+              ? 'Não foi possível excluir a conta.'
+              : 'Não foi possível restaurar a conta.'));
+    } finally {
+      await _disposeControllersAfterDialog([reason]);
+    }
+  }
+
+  /// Exclusão lógica de um acesso administrativo: a linha continua no banco
+  /// porque a auditoria aponta para ela, mas o login deixa de funcionar.
+  Future<void> _accountActions(Map account) async {
+    final active = account['active'] == true;
+    final address = account['email']?.toString() ?? '';
+    await _showAdminDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+                title: _AdminDialogTitle(
+                    icon: Icons.admin_panel_settings_outlined,
+                    code: 'VJ//ACCESS_CONTROL',
+                    title: address.toUpperCase()),
+                content: SizedBox(
+                    width: 500,
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .surfaceContainerHighest,
+                              border: Border.all(
+                                  color: Theme.of(context).colorScheme.ink,
+                                  width: 2)),
+                          child: Row(children: [
+                            Icon(Icons.shield_outlined,
+                                size: 18,
+                                color: Theme.of(context).colorScheme.tertiary),
+                            const SizedBox(width: 10),
+                            Expanded(
+                                child: Text(
+                                    '${_roleLabel(account['role']?.toString() ?? '')} • ${active ? 'ativo' : 'excluído'}',
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.w700)))
+                          ])),
+                      const SizedBox(height: 16),
+                      if (active)
+                        _personActionButton(
+                            Icons.person_remove_outlined,
+                            'Excluir acesso',
+                            'Exclusão lógica: o login para de funcionar e a auditoria é preservada.',
+                            () {
+                          Navigator.pop(context);
+                          _setAccountActive(account, active: false);
+                        }, destructive: true)
+                      else
+                        _personActionButton(
+                            Icons.restore_from_trash_outlined,
+                            'Restaurar acesso',
+                            'Devolve a este e-mail a entrada no painel administrativo.',
+                            () {
+                          Navigator.pop(context);
+                          _setAccountActive(account, active: true);
+                        })
+                    ])),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('FECHAR'))
+                ]));
+  }
+
+  Future<void> _setAccountActive(Map account, {required bool active}) async {
+    final address = account['email']?.toString() ?? 'este acesso';
+    final confirmed = await _confirmDialog(
+        icon: active
+            ? Icons.restore_from_trash_outlined
+            : Icons.person_remove_outlined,
+        code: 'VJ//ACCESS_CONTROL',
+        title: active ? 'RESTAURAR ACESSO' : 'EXCLUIR ACESSO',
+        message: active
+            ? '$address volta a conseguir entrar no painel administrativo.'
+            : '$address perde o acesso ao painel imediatamente. O registro e a auditoria são preservados.',
+        confirmLabel: active ? 'RESTAURAR' : 'EXCLUIR ACESSO',
+        destructive: !active);
+    if (confirmed != true) return;
+    try {
+      final dio = ref.read(dioProvider);
+      final id = account['id'];
+      if (active) {
+        await dio.post('/admin/accounts/$id/restore');
+      } else {
+        await dio.delete('/admin/accounts/$id');
+      }
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(active
+                ? 'Acesso de $address restaurado.'
+                : 'Acesso de $address excluído.')));
+      await _refresh();
+    } on DioException catch (e) {
+      _showError(_message(
+          e,
+          active
+              ? 'Não foi possível restaurar o acesso.'
+              : 'Não foi possível excluir o acesso.'));
+    }
+  }
+
+  /// Confirmação de ação sensível, com motivo obrigatório quando o backend pede.
+  Future<bool?> _confirmDialog(
+          {required IconData icon,
+          required String code,
+          required String title,
+          required String message,
+          required String confirmLabel,
+          bool destructive = false,
+          TextEditingController? reason}) =>
+      _showAdminDialog<bool>(
+          context: context,
+          builder: (context) {
+            final scheme = Theme.of(context).colorScheme;
+            return StatefulBuilder(
+                builder: (context, setDialogState) => AlertDialog(
+                        title: _AdminDialogTitle(
+                            icon: icon, code: code, title: title),
+                        content: SizedBox(
+                            width: 460,
+                            child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                          color: (destructive
+                                                  ? scheme.error
+                                                  : scheme.secondary)
+                                              .withValues(alpha: .12),
+                                          border: Border.all(
+                                              color: destructive
+                                                  ? scheme.error
+                                                  : scheme.ink,
+                                              width: 2)),
+                                      child: Text(message)),
+                                  if (reason != null) ...[
+                                    const SizedBox(height: 16),
+                                    TextField(
+                                        controller: reason,
+                                        autofocus: true,
+                                        minLines: 2,
+                                        maxLines: 4,
+                                        onChanged: (_) => setDialogState(() {}),
+                                        decoration: const InputDecoration(
+                                            labelText: 'Motivo da decisão',
+                                            helperText:
+                                                'Fica registrado no histórico administrativo.'))
+                                  ]
+                                ])),
+                        actions: [
+                          TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('CANCELAR')),
+                          FilledButton(
+                              style: destructive
+                                  ? FilledButton.styleFrom(
+                                      backgroundColor: scheme.error,
+                                      foregroundColor: Colors.white)
+                                  : null,
+                              onPressed:
+                                  reason != null && reason.text.trim().isEmpty
+                                      ? null
+                                      : () => Navigator.pop(context, true),
+                              child: Text(confirmLabel))
+                        ]));
+          });
+
+  /// Criação de acesso administrativo em duas etapas.
+  ///
+  /// A conta **não** é gravada no passo do formulário: o backend só devolve um
+  /// segredo TOTP de rascunho (`/admin/accounts/preview`). Ela passa a existir
+  /// quando quem está criando digita um código válido lido do autenticador — sem
+  /// isso, sairíamos daqui com um acesso que ninguém consegue usar para logar.
   Future<void> _createAdmin() async {
     final email = TextEditingController();
     final password = TextEditingController();
-    Map<String, dynamic>? created;
+    final totp = TextEditingController();
+    var createdEmail = '';
     await _showAdminDialog<void>(
         context: context,
+        barrierDismissible: false,
         builder: (dialogContext) {
           String role = 'ADMIN';
           String? error;
-          bool saving = false;
-          return StatefulBuilder(
-              builder: (context, setDialogState) => AlertDialog(
-                      title: const Text('Criar acesso administrativo'),
-                      content: SizedBox(
-                          width: 480,
-                          child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                    'A pessoa receberá um acesso protegido por senha e TOTP. Escolha somente o nível necessário.'),
-                                const SizedBox(height: 16),
-                                TextField(
-                                    controller: email,
-                                    keyboardType: TextInputType.emailAddress,
-                                    decoration: InputDecoration(
-                                        labelText: 'E-mail do responsável',
-                                        errorText: error != null &&
-                                                email.text.trim().isEmpty
-                                            ? 'Informe o e-mail.'
-                                            : null)),
-                                const SizedBox(height: 12),
-                                TextField(
-                                    controller: password,
-                                    obscureText: true,
-                                    decoration: InputDecoration(
-                                        labelText: 'Senha inicial',
-                                        helperText:
-                                            'Use pelo menos 12 caracteres.',
-                                        errorText: error != null &&
-                                                password.text.length < 12
-                                            ? 'A senha precisa ter 12 caracteres.'
-                                            : null)),
-                                const SizedBox(height: 16),
-                                DropdownButtonFormField<String>(
-                                    initialValue: role,
-                                    items: const [
-                                      DropdownMenuItem(
-                                          value: 'ADMIN',
-                                          child: Text('Administrador')),
-                                      DropdownMenuItem(
-                                          value: 'MODERATOR',
-                                          child: Text('Moderador'))
-                                    ],
-                                    onChanged: saving
-                                        ? null
-                                        : (value) => setDialogState(() {
-                                              role = value!;
-                                              error = null;
-                                            }),
-                                    decoration: const InputDecoration(
-                                        labelText: 'Nível de acesso')),
-                                const SizedBox(height: 12),
-                                Container(
-                                    padding: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .surfaceContainerHighest,
-                                        borderRadius: BorderRadius.circular(8)),
-                                    child: Text(role == 'ADMIN'
-                                        ? 'Administrador: gerencia pessoas, tags, comunicações, figurinhas e contas administrativas. Não pode criar Super Admin.'
-                                        : 'Moderador: cuida de denúncias e da segurança das pessoas. Não cria contas, tags ou configurações do sistema.')),
-                                if (error != null)
-                                  Padding(
-                                      padding: const EdgeInsets.only(top: 12),
+          bool busy = false;
+          Map<String, dynamic>? draft;
+          return StatefulBuilder(builder: (context, setDialogState) {
+            final scheme = Theme.of(context).colorScheme;
+
+            Future<void> requestDraft() async {
+              if (email.text.trim().isEmpty || password.text.length < 12) {
+                setDialogState(() =>
+                    error = 'Revise os campos destacados antes de gerar o QR.');
+                return;
+              }
+              setDialogState(() {
+                busy = true;
+                error = null;
+              });
+              try {
+                final response = await ref
+                    .read(dioProvider)
+                    .post('/admin/accounts/preview', data: {
+                  'email': email.text.trim(),
+                  'password': password.text,
+                  'role': role
+                });
+                setDialogState(() {
+                  draft = response.data as Map<String, dynamic>;
+                  busy = false;
+                });
+              } on DioException catch (e) {
+                setDialogState(() {
+                  busy = false;
+                  error = _message(e,
+                      'Não foi possível preparar o acesso. Confira os dados e tente novamente.');
+                });
+              }
+            }
+
+            Future<void> confirmAndCreate() async {
+              if (totp.text.trim().length != 6) {
+                setDialogState(() => error =
+                    'Digite os 6 dígitos que aparecem no autenticador.');
+                return;
+              }
+              setDialogState(() {
+                busy = true;
+                error = null;
+              });
+              try {
+                await ref.read(dioProvider).post('/admin/accounts', data: {
+                  'email': email.text.trim(),
+                  'password': password.text,
+                  'role': role,
+                  'totpSecret': draft!['totpSecret'],
+                  'totpCode': totp.text.trim()
+                });
+                createdEmail = email.text.trim();
+                if (context.mounted) Navigator.pop(context);
+              } on DioException catch (e) {
+                setDialogState(() {
+                  busy = false;
+                  error = _message(e,
+                      'Não foi possível confirmar o código. A conta ainda não foi criada.');
+                });
+              }
+            }
+
+            return AlertDialog(
+                title: _AdminDialogTitle(
+                    icon: draft == null
+                        ? Icons.person_add_alt_1_outlined
+                        : Icons.qr_code_2_outlined,
+                    code: draft == null
+                        ? 'VJ//NEW_ADMIN_ACCESS'
+                        : 'VJ//AUTHENTICATOR_HANDSHAKE',
+                    title: draft == null
+                        ? 'CRIAR ACESSO ADMINISTRATIVO'
+                        : 'CONFIRMAR AUTENTICADOR'),
+                content: SizedBox(
+                    width: 480,
+                    child: SingleChildScrollView(
+                        child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                          _adminStepTrail(scheme, draft == null ? 0 : 1),
+                          const SizedBox(height: 16),
+                          if (draft == null)
+                            ..._createAdminForm(
+                                scheme: scheme,
+                                email: email,
+                                password: password,
+                                role: role,
+                                busy: busy,
+                                showErrors: error != null,
+                                onRole: (value) => setDialogState(() {
+                                      role = value;
+                                      error = null;
+                                    }))
+                          else
+                            ..._createAdminConfirmation(
+                                scheme: scheme,
+                                draft: draft!,
+                                totp: totp,
+                                busy: busy,
+                                onChanged: () => setDialogState(() {})),
+                          if (error != null)
+                            Container(
+                                width: double.infinity,
+                                margin: const EdgeInsets.only(top: 14),
+                                padding: const EdgeInsets.all(11),
+                                decoration: BoxDecoration(
+                                    color: scheme.error.withValues(alpha: .12),
+                                    border: Border.all(
+                                        color: scheme.error, width: 2)),
+                                child: Row(children: [
+                                  Icon(Icons.error_outline,
+                                      color: scheme.error, size: 19),
+                                  const SizedBox(width: 9),
+                                  Expanded(
                                       child: Text(error!,
                                           style: TextStyle(
-                                              color: Theme.of(context)
-                                                  .colorScheme
-                                                  .error,
+                                              color: scheme.error,
                                               fontWeight: FontWeight.w700)))
-                              ])),
-                      actions: [
-                        TextButton(
-                            onPressed:
-                                saving ? null : () => Navigator.pop(context),
-                            child: const Text('Cancelar')),
-                        FilledButton(
-                            onPressed: saving
-                                ? null
-                                : () async {
-                                    if (email.text.trim().isEmpty ||
-                                        password.text.length < 12) {
-                                      setDialogState(() => error =
-                                          'Revise os campos destacados antes de criar o acesso.');
-                                      return;
-                                    }
-                                    setDialogState(() {
-                                      saving = true;
-                                      error = null;
-                                    });
-                                    try {
-                                      final response = await ref
-                                          .read(dioProvider)
-                                          .post('/admin/accounts', data: {
-                                        'email': email.text.trim(),
-                                        'password': password.text,
-                                        'role': role
-                                      });
-                                      created =
-                                          response.data as Map<String, dynamic>;
-                                      if (context.mounted)
-                                        Navigator.pop(context);
-                                    } on DioException catch (e) {
-                                      setDialogState(() {
-                                        saving = false;
-                                        error = _message(e,
-                                            'Não foi possível criar o acesso. Confira os dados e tente novamente.');
-                                      });
-                                    }
-                                  },
-                            child: Text(
-                                saving ? 'Criando...' : 'Criar e gerar TOTP'))
-                      ]));
+                                ]))
+                        ]))),
+                actions: [
+                  TextButton(
+                      onPressed: busy
+                          ? null
+                          : draft == null
+                              ? () => Navigator.pop(context)
+                              : () => setDialogState(() {
+                                    draft = null;
+                                    totp.clear();
+                                    error = null;
+                                  }),
+                      child: Text(draft == null ? 'CANCELAR' : 'VOLTAR')),
+                  FilledButton(
+                      onPressed: busy
+                          ? null
+                          : draft == null
+                              ? requestDraft
+                              : confirmAndCreate,
+                      child: Text(busy
+                          ? 'AGUARDE...'
+                          : draft == null
+                              ? 'GERAR QR'
+                              : 'CONFIRMAR E CRIAR'))
+                ]);
+          });
         });
-    email.dispose();
-    password.dispose();
-    if (created == null || !mounted) return;
-    await _showTotp(created!);
+    await _disposeControllersAfterDialog([email, password, totp]);
+    if (createdEmail.isEmpty || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Acesso de $createdEmail criado e validado.')));
     await _refresh();
   }
 
-  Future<void> _showTotp(Map<String, dynamic> data) => _showAdminDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-              title: const Text('TOTP do novo administrador'),
-              content: SizedBox(
-                  width: 440,
-                  child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    const Text(
-                        'Escaneie este QR no Google Authenticator, Authy ou similar. Ele é mostrado somente agora.'),
-                    const SizedBox(height: 16),
-                    QrImageView(data: data['totpUri'] as String, size: 220),
-                    const SizedBox(height: 12),
-                    SelectableText(data['totpSecret'] as String,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                            fontFamily: 'monospace',
-                            fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 8),
-                    Text(data['email'] as String)
-                  ])),
-              actions: [
-                FilledButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Concluído'))
-              ]));
+  List<Widget> _createAdminForm(
+          {required ColorScheme scheme,
+          required TextEditingController email,
+          required TextEditingController password,
+          required String role,
+          required bool busy,
+          required bool showErrors,
+          required ValueChanged<String> onRole}) =>
+      [
+        const Text(
+            'A pessoa receberá um acesso protegido por senha e autenticador. Escolha somente o nível necessário.'),
+        const SizedBox(height: 16),
+        TextField(
+            controller: email,
+            enabled: !busy,
+            keyboardType: TextInputType.emailAddress,
+            decoration: InputDecoration(
+                labelText: 'E-mail do responsável',
+                prefixIcon: const Icon(Icons.alternate_email),
+                errorText: showErrors && email.text.trim().isEmpty
+                    ? 'Informe o e-mail.'
+                    : null)),
+        const SizedBox(height: 12),
+        TextField(
+            controller: password,
+            enabled: !busy,
+            obscureText: true,
+            decoration: InputDecoration(
+                labelText: 'Senha inicial',
+                prefixIcon: const Icon(Icons.key_outlined),
+                helperText: 'Use pelo menos 12 caracteres.',
+                errorText: showErrors && password.text.length < 12
+                    ? 'A senha precisa ter 12 caracteres.'
+                    : null)),
+        const SizedBox(height: 16),
+        DropdownButtonFormField<String>(
+            initialValue: role,
+            items: const [
+              DropdownMenuItem(value: 'ADMIN', child: Text('Administrador')),
+              DropdownMenuItem(value: 'MODERATOR', child: Text('Moderador'))
+            ],
+            onChanged: busy ? null : (value) => onRole(value!),
+            decoration: const InputDecoration(
+                labelText: 'Nível de acesso',
+                prefixIcon: Icon(Icons.shield_outlined))),
+        const SizedBox(height: 12),
+        Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+                color: scheme.surfaceContainerHighest,
+                border: Border.all(color: scheme.ink, width: 2)),
+            child: Row(children: [
+              Icon(Icons.info_outline, size: 19, color: scheme.tertiary),
+              const SizedBox(width: 10),
+              Expanded(
+                  child: Text(role == 'ADMIN'
+                      ? 'Administrador: gerencia pessoas, tags, comunicações, figurinhas e contas administrativas. Não pode criar Super Admin.'
+                      : 'Moderador: cuida de denúncias e da segurança das pessoas. Não cria contas, tags ou configurações do sistema.'))
+            ]))
+      ];
+
+  List<Widget> _createAdminConfirmation(
+          {required ColorScheme scheme,
+          required Map<String, dynamic> draft,
+          required TextEditingController totp,
+          required bool busy,
+          required VoidCallback onChanged}) =>
+      [
+        Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(11),
+            decoration: BoxDecoration(
+                color: scheme.secondary.withValues(alpha: .14),
+                border: Border.all(color: scheme.ink, width: 2)),
+            child: Row(children: [
+              Icon(Icons.pending_outlined, size: 19, color: scheme.secondary),
+              const SizedBox(width: 10),
+              const Expanded(
+                  child: Text(
+                      'A conta ainda NÃO foi criada. Escaneie o QR, digite o código gerado e só então o acesso passa a existir.'))
+            ])),
+        const SizedBox(height: 16),
+        Center(child: _AdminQrCard(uri: draft['totpUri'] as String)),
+        const SizedBox(height: 14),
+        Text('CHAVE MANUAL',
+            style: Theme.of(context)
+                .textTheme
+                .labelMedium
+                ?.copyWith(color: scheme.tertiary, fontSize: 9)),
+        const SizedBox(height: 6),
+        Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+                color: scheme.surfaceContainerHighest,
+                border: Border.all(color: scheme.ink, width: 2)),
+            child: SelectableText(draft['totpSecret'] as String,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                    fontFamily: 'IBMPlexMono',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    letterSpacing: 1.2))),
+        const SizedBox(height: 6),
+        Center(
+            child: Text(draft['email'] as String,
+                style: TextStyle(
+                    color: scheme.onSurfaceVariant,
+                    fontFamily: 'IBMPlexMono',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700))),
+        const SizedBox(height: 16),
+        TextField(
+            controller: totp,
+            enabled: !busy,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            maxLength: 6,
+            onChanged: (_) => onChanged(),
+            decoration: const InputDecoration(
+                labelText: 'Código do autenticador',
+                counterText: '',
+                helperText: 'Seis dígitos, válidos por 30 segundos.',
+                prefixIcon: Icon(Icons.pin_outlined)))
+      ];
+
+  /// Trilha "01 → 02" das duas etapas, no mesmo vocabulário de nós de rota do app.
+  Widget _adminStepTrail(ColorScheme scheme, int current) {
+    Widget step(int index, String label) {
+      final active = index <= current;
+      return Expanded(
+          child: Row(children: [
+        Container(
+            width: 24,
+            height: 24,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+                color: active ? scheme.secondary : scheme.surface,
+                border: Border.all(color: scheme.ink, width: 2)),
+            child: Text('0${index + 1}',
+                style: TextStyle(
+                    color: active ? Colors.white : scheme.onSurfaceVariant,
+                    fontFamily: 'IBMPlexMono',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 10))),
+        const SizedBox(width: 8),
+        Expanded(
+            child: Text(label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    color: active ? scheme.ink : scheme.onSurfaceVariant,
+                    fontFamily: 'IBMPlexMono',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 9)))
+      ]));
+    }
+
+    return Row(children: [
+      step(0, 'DADOS'),
+      Container(width: 22, height: 2, color: scheme.tertiary),
+      const SizedBox(width: 8),
+      step(1, 'AUTENTICADOR')
+    ]);
+  }
+
   Future<void> _changePassword() async {
     final current = TextEditingController();
     final next = TextEditingController();
     final totp = TextEditingController();
-    final ok = await _formDialog('Alterar minha senha', [
-      TextField(
-          controller: current,
-          obscureText: true,
-          decoration: const InputDecoration(labelText: 'Senha atual')),
-      TextField(
-          controller: next,
-          obscureText: true,
-          decoration: const InputDecoration(
-              labelText: 'Nova senha (mín. 12 caracteres)')),
-      TextField(
-          controller: totp,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(labelText: 'Código TOTP'))
-    ]);
+    final ok = await _formDialog(
+        'Alterar minha senha',
+        [
+          TextField(
+              controller: current,
+              obscureText: true,
+              decoration: const InputDecoration(
+                  labelText: 'Senha atual',
+                  prefixIcon: Icon(Icons.lock_outline))),
+          TextField(
+              controller: next,
+              obscureText: true,
+              decoration: const InputDecoration(
+                  labelText: 'Nova senha (mín. 12 caracteres)',
+                  prefixIcon: Icon(Icons.key_outlined))),
+          TextField(
+              controller: totp,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                  labelText: 'Código TOTP',
+                  prefixIcon: Icon(Icons.pin_outlined)))
+        ],
+        icon: Icons.password_outlined,
+        code: 'VJ//CREDENTIAL_ROTATION');
     if (ok != true) return;
     try {
       await ref.read(dioProvider).post('/admin/auth/password', data: {
@@ -1216,11 +1748,14 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
     }
   }
 
-  Future<bool?> _formDialog(String title, List<Widget> fields) =>
+  Future<bool?> _formDialog(String title, List<Widget> fields,
+          {IconData icon = Icons.edit_note_outlined,
+          String code = 'VJ//ADMIN_FORM'}) =>
       _showAdminDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-                  title: Text(title),
+                  title: _AdminDialogTitle(
+                      icon: icon, code: code, title: title.toUpperCase()),
                   content: SizedBox(
                       width: 420,
                       child: Column(
@@ -1470,12 +2005,24 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
                       Text(_loading ? 'SINCRONIZANDO' : 'ATUALIZADO',
                           style: _systemText(scheme))
                     ])),
+                // A corrida geométrica fica atrás da lista: preenche o vazio
+                // quando há poucos registros e some sob as linhas (opacas)
+                // quando a lista enche. O título da seção está fora do card,
+                // então continua sobre fundo limpo.
                 Expanded(
-                    child: _loading && meta.count == 0
-                        ? const Center(
-                            child: NeoLoadingIndicator(
-                                label: 'CARREGANDO REGISTROS'))
-                        : _sectionList(scheme))
+                    child: ClipRRect(
+                        borderRadius: const BorderRadius.vertical(
+                            bottom: Radius.circular(3)),
+                        child: Stack(children: [
+                          const Positioned.fill(
+                              child: NeoGeometryRunBackdrop()),
+                          Positioned.fill(
+                              child: _loading && meta.count == 0
+                                  ? const Center(
+                                      child: NeoLoadingIndicator(
+                                          label: 'CARREGANDO REGISTROS'))
+                                  : _sectionList(scheme))
+                        ])))
               ])))
     ]);
   }
@@ -1494,6 +2041,11 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
           icon: const _AdminActionIcon(icon: Icons.add),
           onPressed: _createTagWithFile,
           child: const Text('NOVA TAG')),
+      _AdminSection.newsletters => NeoButton(
+          height: 48,
+          icon: const _AdminActionIcon(icon: Icons.campaign_outlined),
+          onPressed: () => _sendNewsletter(),
+          child: const Text('NOVA NEWSLETTER')),
       _AdminSection.accounts when _superAdmin => NeoButton(
           height: 48,
           icon: const _AdminActionIcon(icon: Icons.person_add_alt_1_outlined),
@@ -1507,6 +2059,7 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
     final items = switch (_section) {
       _AdminSection.people => _users,
       _AdminSection.reports => _reports,
+      _AdminSection.newsletters => _newsletters,
       _AdminSection.stickers => _stickers,
       _AdminSection.tags => _tags,
       _AdminSection.accounts => _accounts
@@ -1521,10 +2074,14 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
 
   Widget _recordRow(ColorScheme scheme, Map item) => switch (_section) {
         _AdminSection.people => _adminRow(scheme,
-            icon: Icons.person_outline,
+            icon: item['deleted'] == true
+                ? Icons.person_off_outlined
+                : Icons.person_outline,
             title: item['fullName']?.toString() ?? 'Sem nome',
             subtitle: item['email']?.toString() ?? '',
-            status: _humanStatus(item['verificationStatus']?.toString()),
+            status: item['deleted'] == true
+                ? 'EXCLUÍDA'
+                : _humanStatus(item['verificationStatus']?.toString()),
             onTap: () => _personActions(item)),
         _AdminSection.reports => _adminRow(scheme,
             icon: Icons.gpp_maybe_outlined,
@@ -1532,6 +2089,14 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
             subtitle:
                 '${item['evidenceCount'] ?? 0} evidência(s) selecionada(s)',
             status: _humanStatus(item['status']?.toString())),
+        _AdminSection.newsletters => _adminRow(scheme,
+            icon: Icons.campaign_outlined,
+            title: item['title']?.toString() ?? 'Sem título',
+            subtitle: _newsletterSubtitle(item),
+            status: _humanStatus(item['status']?.toString()),
+            onTap: item['status'] == 'SCHEDULED'
+                ? () => _cancelNewsletter(item)
+                : null),
         _AdminSection.stickers => _adminRow(scheme,
             icon: Icons.emoji_emotions_outlined,
             title: item['label']?.toString() ?? 'Sem nome',
@@ -1549,10 +2114,13 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
             subtitle: item['color']?.toString() ?? '',
             status: 'EM USO'),
         _AdminSection.accounts => _adminRow(scheme,
-            icon: Icons.admin_panel_settings_outlined,
+            icon: item['active'] == true
+                ? Icons.admin_panel_settings_outlined
+                : Icons.person_off_outlined,
             title: item['email']?.toString() ?? '',
             subtitle: _roleLabel(item['role']?.toString() ?? ''),
-            status: item['active'] == true ? 'ATIVO' : 'INATIVO')
+            status: item['active'] == true ? 'ATIVO' : 'EXCLUÍDO',
+            onTap: _superAdmin ? () => _accountActions(item) : null)
       };
 
   Widget _adminRow(ColorScheme scheme,
@@ -1674,6 +2242,14 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
             'denúncias',
             Icons.gpp_maybe_outlined,
             _reports.length),
+        _AdminSection.newsletters => _AdminSectionMeta(
+            'NEWSLETTERS',
+            'NEWSLETTERS',
+            'VJ//BROADCAST',
+            'Monte comunicações em embed e escolha quem recebe.',
+            'newsletters',
+            Icons.campaign_outlined,
+            _newsletters.length),
         _AdminSection.stickers => _AdminSectionMeta(
             'FIGURINHAS',
             'BIBLIOTECA DE FIGURINHAS',
@@ -1706,6 +2282,37 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
       fontWeight: FontWeight.w700,
       letterSpacing: .7,
       fontSize: 10);
+
+  String _newsletterSubtitle(Map item) {
+    final recipients = item['recipientCount'] ?? 0;
+    if (item['status'] == 'SCHEDULED') {
+      final when = DateTime.tryParse(item['scheduledFor']?.toString() ?? '');
+      return when == null
+          ? 'Agendada'
+          : 'Agendada para ${when.toLocal()}'.split('.').first;
+    }
+    if (item['status'] == 'FAILED') {
+      return item['failureReason']?.toString() ?? 'Falhou no envio.';
+    }
+    return '$recipients destinatário(s) • ${item['readCount'] ?? 0} leram';
+  }
+
+  Future<void> _cancelNewsletter(Map item) async {
+    final confirmed = await _confirmDialog(
+        icon: Icons.campaign_outlined,
+        code: 'VJ//BROADCAST_CANCEL',
+        title: 'CANCELAR ENVIO AGENDADO?',
+        message: 'A newsletter "${item['title']}" não será enviada.',
+        confirmLabel: 'CANCELAR ENVIO',
+        destructive: true);
+    if (confirmed != true) return;
+    try {
+      await ref.read(dioProvider).post('/admin/newsletters/${item['id']}/cancel');
+      await _refresh();
+    } on DioException catch (e) {
+      _showError(_message(e, 'Não foi possível cancelar a newsletter.'));
+    }
+  }
 
   String _humanStatus(String? value) =>
       (value ?? 'SEM STATUS').replaceAll('_', ' ').toUpperCase();
@@ -1766,6 +2373,34 @@ class _AdminActionIcon extends StatelessWidget {
       color: Colors.white,
       child:
           Icon(icon, color: Theme.of(context).colorScheme.primary, size: 18));
+}
+
+/// QR sempre sobre papel branco com módulos pretos.
+///
+/// O `QrImageView` nasce com fundo transparente, então no tema escuro o código
+/// ficava preto sobre superfície escura — ilegível para a câmera do celular. A
+/// leitura depende do contraste, não do tema do painel.
+class _AdminQrCard extends StatelessWidget {
+  const _AdminQrCard({required this.uri});
+  final String uri;
+
+  @override
+  Widget build(BuildContext context) => Container(
+      decoration: NeoBrutal.decoration(
+          color: Colors.white,
+          borderColor: Theme.of(context).colorScheme.ink,
+          offset: NeoBrutal.shadowOffsetSmall),
+      padding: const EdgeInsets.all(10),
+      child: QrImageView(
+          data: uri,
+          size: 200,
+          backgroundColor: Colors.white,
+          padding: EdgeInsets.zero,
+          eyeStyle: const QrEyeStyle(
+              eyeShape: QrEyeShape.square, color: NeoBrutal.inkLight),
+          dataModuleStyle: const QrDataModuleStyle(
+              dataModuleShape: QrDataModuleShape.square,
+              color: NeoBrutal.inkLight)));
 }
 
 class _AdminSquareButton extends StatefulWidget {
@@ -2051,18 +2686,14 @@ class _AdminColorPickerState extends State<_AdminColorPicker> {
                       .textTheme
                       .labelMedium
                       ?.copyWith(color: scheme.tertiary, fontSize: 9)),
+              const SizedBox(height: 4),
+              Text('Arraste no quadro para o tom e na faixa para a matiz.',
+                  style:
+                      TextStyle(color: scheme.onSurfaceVariant, fontSize: 11)),
               const SizedBox(height: 8),
-              Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: List.generate(36, (index) {
-                    final row = index ~/ 12;
-                    final hue = (index % 12) * 30.0;
-                    final saturation = [0.85, 0.65, 0.45][row];
-                    final value = [0.95, 0.78, 0.62][row];
-                    return _colorTile(
-                        HSVColor.fromAHSV(1, hue, saturation, value).toColor());
-                  }))
+              _NeoColorField(
+                  color: _selected,
+                  onChanged: (next) => _select(next, syncText: true))
             ]))
       ]
     ]);
@@ -2091,6 +2722,121 @@ class _AdminColorPickerState extends State<_AdminColorPicker> {
                             color: selected ? Colors.white : color,
                             width: 2))))));
   }
+}
+
+/// Seletor contínuo de cor: quadro de saturação/brilho + faixa de matiz, ambos
+/// de arrastar. Substitui a grade de amostras fixas, que só alcançava 36 cores.
+class _NeoColorField extends StatefulWidget {
+  const _NeoColorField({required this.color, required this.onChanged});
+  final Color color;
+  final ValueChanged<Color> onChanged;
+
+  @override
+  State<_NeoColorField> createState() => _NeoColorFieldState();
+}
+
+class _NeoColorFieldState extends State<_NeoColorField> {
+  late HSVColor _hsv = HSVColor.fromColor(widget.color);
+
+  @override
+  void didUpdateWidget(_NeoColorField old) {
+    super.didUpdateWidget(old);
+    // Só reposiciona os thumbs quando a cor chegou de fora (campo hexadecimal,
+    // amostra pronta). Reagir ao nosso próprio arrasto faria a matiz saltar para
+    // 0 sempre que o usuário passasse pelo branco ou pelo preto, onde o HSV da
+    // cor não guarda mais o ângulo.
+    if (widget.color.toARGB32() != _hsv.toColor().toARGB32()) {
+      _hsv = HSVColor.fromColor(widget.color);
+    }
+  }
+
+  void _emit(HSVColor next) {
+    setState(() => _hsv = next);
+    widget.onChanged(next.toColor());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final hueColor = HSVColor.fromAHSV(1, _hsv.hue, 1, 1).toColor();
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      LayoutBuilder(builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        const height = 148.0;
+        void pick(Offset position) => _emit(_hsv
+            .withSaturation((position.dx / width).clamp(0.0, 1.0))
+            .withValue((1 - position.dy / height).clamp(0.0, 1.0)));
+        return GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onPanDown: (details) => pick(details.localPosition),
+            onPanUpdate: (details) => pick(details.localPosition),
+            child: Container(
+                width: width,
+                height: height,
+                decoration: BoxDecoration(
+                    border: Border.all(color: scheme.ink, width: 2)),
+                child: Stack(children: [
+                  Positioned.fill(
+                      child: DecoratedBox(
+                          decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                  colors: [Colors.white, hueColor])))),
+                  const Positioned.fill(
+                      child: DecoratedBox(
+                          decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                        Colors.transparent,
+                        Colors.black
+                      ])))),
+                  Positioned(
+                      left: _hsv.saturation * width - 11,
+                      top: (1 - _hsv.value) * height - 11,
+                      child: _thumb(scheme, _hsv.toColor()))
+                ])));
+      }),
+      const SizedBox(height: 10),
+      LayoutBuilder(builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        void pick(Offset position) =>
+            _emit(_hsv.withHue(((position.dx / width).clamp(0.0, 1.0)) * 360));
+        return GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onPanDown: (details) => pick(details.localPosition),
+            onPanUpdate: (details) => pick(details.localPosition),
+            child: Container(
+                width: width,
+                height: 30,
+                decoration: BoxDecoration(
+                    border: Border.all(color: scheme.ink, width: 2),
+                    gradient: LinearGradient(
+                        colors: List.generate(
+                            13,
+                            (index) =>
+                                HSVColor.fromAHSV(1, index * 30.0 % 360, 1, 1)
+                                    .toColor()))),
+                child: Stack(children: [
+                  Positioned(
+                      left: (_hsv.hue / 360) * width - 11,
+                      top: -1,
+                      child: _thumb(scheme, hueColor))
+                ])));
+      })
+    ]);
+  }
+
+  Widget _thumb(ColorScheme scheme, Color color) => Container(
+      width: 22,
+      height: 22,
+      decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 3),
+          boxShadow: [
+            BoxShadow(color: scheme.ink, offset: const Offset(1, 1))
+          ]));
 }
 
 class _AdminChatEmptyState extends StatelessWidget {

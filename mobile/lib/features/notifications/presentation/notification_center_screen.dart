@@ -1,8 +1,22 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/neo_brutal_theme.dart';
 import '../../../core/ui/neo_card.dart';
 import '../data/repositories/notification_repository.dart';
+import 'newsletter_screen.dart';
+
+/// Notificação de newsletter carrega só o ponteiro: `{"newsletterId": "..."}`.
+String? _newsletterId(String? payload) {
+  if (payload == null || payload.isEmpty) return null;
+  try {
+    final decoded = jsonDecode(payload);
+    return decoded is Map ? decoded['newsletterId']?.toString() : null;
+  } on FormatException {
+    return null;
+  }
+}
 
 final notificationsProvider =
     FutureProvider((ref) => ref.watch(notificationRepositoryProvider).list());
@@ -35,6 +49,12 @@ class NotificationCenterScreen extends ConsumerWidget {
                                 .read(notificationRepositoryProvider)
                                 .markRead(item.id);
                             ref.invalidate(notificationsProvider);
+                            final newsletterId = _newsletterId(item.payload);
+                            if (newsletterId != null && context.mounted) {
+                              await Navigator.of(context).push(MaterialPageRoute(
+                                  builder: (_) => NewsletterScreen(
+                                      newsletterId: newsletterId)));
+                            }
                           },
                           child: NeoCard(
                               color: item.isRead

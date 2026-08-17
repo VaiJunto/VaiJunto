@@ -42,6 +42,7 @@ public class MediaStorageService {
     private final MediaObjectRepository media;
     private final UserRepository users;
     private final ConversationRepository conversations;
+    private final com.vaijunto.repository.AdminAccountRepository adminAccounts;
 
     @Transactional
     public MediaUploadIntentDto intent(MediaUploadIntentRequest request, String email) {
@@ -105,6 +106,59 @@ public class MediaStorageService {
         for (MediaObject object : media.findByStatusAndCategoryAndDeleteAfterLessThanEqualOrderByDeleteAfterAsc("ACTIVE", "CHAT", OffsetDateTime.now())) deleteRemote(object, "RETENTION_EXPIRED");
     }
 
+    /**
+     * Upload de mídia administrativa (componente de newsletter ou anexo de
+     * mensagem do admin). Diferente do fluxo do app, os bytes passam pelo
+     * backend: o painel é web e um PUT direto no R2 dependeria de CORS
+     * configurado no bucket. O volume aqui é baixo, então vale a simplicidade.
+     *
+     * <p>Esta mídia é <b>permanente</b>: {@code delete_after} fica nulo e a
+     * limpeza automática só varre {@code category='CHAT'}.
+     */
+    @Transactional
+    public UUID uploadAdminMedia(String adminEmail, String category, String contentType, long sizeBytes,
+                                 Integer durationSeconds, byte[] content) {
+        var admin = adminAccounts.findByEmail(adminEmail)
+                .orElseThrow(() -> new ApiException(HttpStatus.FORBIDDEN, "ADMIN_NOT_FOUND", "Administrador inválido."));
+        String normalized = category == null ? "" : category.toUpperCase(Locale.ROOT);
+        if (!Set.of("NEWSLETTER", "ADMIN_MESSAGE").contains(normalized))
+            throw bad("MEDIA_CATEGORY_INVALID", "Categoria de mídia inválida.");
+        String type = contentType == null ? "" : contentType.toLowerCase(Locale.ROOT);
+        validateAdminMedia(type, sizeBytes, durationSeconds);
+        requireR2();
+        ensureCapacity(sizeBytes);
+        String key = normalized.toLowerCase(Locale.ROOT) + "/" + admin.getId() + "/" + UUID.randomUUID();
+        clients.getObject().putObject(PutObjectRequest.builder().bucket(r2.bucket()).key(key)
+                .contentType(type).contentLength(sizeBytes).build(),
+                software.amazon.awssdk.core.sync.RequestBody.fromBytes(content));
+        var object = media.save(MediaObject.builder().adminOwner(admin).storageKey(key).category(normalized)
+                .contentType(type).sizeBytes(sizeBytes).durationSeconds(durationSeconds).status("ACTIVE").build());
+        return object.getId();
+    }
+
+    /**
+     * URL de leitura de mídia administrativa. Quem chama já autorizou (o
+     * destinatário da newsletter ou o participante da conversa). Uma hora de
+     * validade: áudio e vídeo seguem buscando bytes depois da tela abrir.
+     */
+    @Transactional(readOnly = true)
+    public String adminMediaUrl(UUID id) {
+        MediaObject object = media.findById(id).orElseThrow(() -> bad("MEDIA_NOT_FOUND", "Mídia não encontrada."));
+        if (!"ACTIVE".equals(object.getStatus())) throw bad("MEDIA_UNAVAILABLE", "Mídia indisponível.");
+        requireR2();
+        return presigners.getObject().presignGetObject(GetObjectPresignRequest.builder()
+                .getObjectRequest(GetObjectRequest.builder().bucket(r2.bucket()).key(object.getStorageKey()).build())
+                .signatureDuration(Duration.ofHours(1)).build()).url().toString();
+    }
+
+    private void validateAdminMedia(String type, long sizeBytes, Integer durationSeconds) {
+        if (sizeBytes <= 0) throw bad("MEDIA_EMPTY", "Arquivo vazio.");
+        if (type.startsWith("image/") && sizeBytes <= 8 * MB) return;
+        if (type.startsWith("video/") && sizeBytes <= 40 * MB && (durationSeconds == null || durationSeconds <= 120)) return;
+        if (type.startsWith("audio/") && sizeBytes <= 10 * MB && (durationSeconds == null || durationSeconds <= 600)) return;
+        throw bad("MEDIA_LIMIT_EXCEEDED", "A mídia excede o tipo, duração ou tamanho permitido.");
+    }
+
     /** Used only after an authorized moderator explicitly confirms evidence removal. */
     @Transactional
     public void deleteReportedMedia(UUID id, String reason) {
@@ -146,7 +200,7 @@ public class MediaStorageService {
     }
 
     private boolean participant(Conversation c, User u) { return c.getParticipantA() != null && c.getParticipantA().getId().equals(u.getId()) || c.getParticipantB() != null && c.getParticipantB().getId().equals(u.getId()); }
-    private boolean canRead(MediaObject object, User user) { return object.getOwner().getId().equals(user.getId()) || object.getConversation() != null && participant(object.getConversation(), user); }
+    private boolean canRead(MediaObject object, User user) { return object.getOwner() != null && object.getOwner().getId().equals(user.getId()) || object.getConversation() != null && participant(object.getConversation(), user); }
     private void requireR2() { if (!r2.configured() || !r2.isCloudflareR2() || clients.getIfAvailable() == null || presigners.getIfAvailable() == null) throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "MEDIA_NOT_CONFIGURED", "O armazenamento Cloudflare R2 ainda não está configurado."); }
     private ApiException bad(String code, String message) { return new ApiException(HttpStatus.BAD_REQUEST, code, message); }
 }
