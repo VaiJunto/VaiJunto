@@ -147,6 +147,6 @@ public class MediaStorageService {
 
     private boolean participant(Conversation c, User u) { return c.getParticipantA() != null && c.getParticipantA().getId().equals(u.getId()) || c.getParticipantB() != null && c.getParticipantB().getId().equals(u.getId()); }
     private boolean canRead(MediaObject object, User user) { return object.getOwner().getId().equals(user.getId()) || object.getConversation() != null && participant(object.getConversation(), user); }
-    private void requireR2() { if (!r2.configured() || clients.getIfAvailable() == null || presigners.getIfAvailable() == null) throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "MEDIA_NOT_CONFIGURED", "O armazenamento de mídia ainda não está configurado."); }
+    private void requireR2() { if (!r2.configured() || !r2.isCloudflareR2() || clients.getIfAvailable() == null || presigners.getIfAvailable() == null) throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "MEDIA_NOT_CONFIGURED", "O armazenamento Cloudflare R2 ainda não está configurado."); }
     private ApiException bad(String code, String message) { return new ApiException(HttpStatus.BAD_REQUEST, code, message); }
 }

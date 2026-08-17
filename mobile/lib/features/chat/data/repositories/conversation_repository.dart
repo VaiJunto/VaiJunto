@@ -156,10 +156,17 @@ class ChatMedia {
 }
 
 class ChatSticker {
-  const ChatSticker({required this.code, required this.label});
-  final String code, label;
-  factory ChatSticker.fromJson(Map<String, dynamic> json) =>
-      ChatSticker(code: json['code'] as String, label: json['label'] as String);
+  const ChatSticker(
+      {required this.id,
+      required this.code,
+      required this.label,
+      required this.assetPath});
+  final String id, code, label, assetPath;
+  factory ChatSticker.fromJson(Map<String, dynamic> json) => ChatSticker(
+      id: json['id'] as String,
+      code: json['code'] as String,
+      label: json['label'] as String,
+      assetPath: json['assetPath'] as String);
 }
 
 class ChatMessageDraft {

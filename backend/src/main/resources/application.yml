@@ -1,4 +1,8 @@
 spring:
+  servlet:
+    multipart:
+      max-file-size: 3MB
+      max-request-size: 3MB
   # Desenvolvimento local: permite credenciais em ../.env.local, que fica fora
   # do repositório. Em produção, Docker injeta as mesmas chaves pelo .env da VPS.
   config:

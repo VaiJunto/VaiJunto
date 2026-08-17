@@ -256,16 +256,21 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     final selected = await showModalBottomSheet<ChatSticker>(
         context: context,
         builder: (_) => SafeArea(
-            child: Wrap(
+            child: GridView.count(
+                crossAxisCount: 3,
+                shrinkWrap: true,
                 children: stickers
-                    .map((sticker) => ListTile(
-                        title: Text(sticker.code,
-                            style: const TextStyle(fontSize: 28)),
-                        subtitle: Text(sticker.label),
-                        onTap: () => Navigator.pop(context, sticker)))
+                    .map((sticker) => InkWell(
+                        onTap: () => Navigator.pop(context, sticker),
+                        child: Padding(
+                            padding: const EdgeInsets.all(10),
+                            child: Image.network(
+                                '${ApiClient.baseUrl}${sticker.assetPath}',
+                                fit: BoxFit.contain,
+                                semanticLabel: sticker.label))))
                     .toList())));
     if (selected == null) return;
-    _text.text = 'STICKER:${selected.code}';
+    _text.text = 'STICKER:${selected.id}';
     await _send();
   }
 
@@ -710,15 +715,24 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                                                         fontSize: 10,
                                                         fontWeight:
                                                             FontWeight.w800))),
-                                          Text(
-                                              message.deleted
-                                                  ? 'MENSAGEM APAGADA'
-                                                  : (message.body ??
-                                                      'LOCALIZAÇÃO'),
-                                              style: TextStyle(
-                                                  color: mine
-                                                      ? Colors.white
-                                                      : scheme.ink)),
+                                          if (!message.deleted &&
+                                              (message.body ?? '')
+                                                  .startsWith('STICKER:'))
+                                            Image.network(
+                                                '${ApiClient.baseUrl}/stickers/${message.body!.substring('STICKER:'.length)}/asset',
+                                                width: 160,
+                                                height: 160,
+                                                fit: BoxFit.contain)
+                                          else
+                                            Text(
+                                                message.deleted
+                                                    ? 'MENSAGEM APAGADA'
+                                                    : (message.body ??
+                                                        'LOCALIZAÇÃO'),
+                                                style: TextStyle(
+                                                    color: mine
+                                                        ? Colors.white
+                                                        : scheme.ink)),
                                           if (!message.deleted &&
                                               message.editedAt != null)
                                             Text('EDITADA',

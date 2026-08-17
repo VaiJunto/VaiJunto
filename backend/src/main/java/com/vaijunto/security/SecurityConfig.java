@@ -62,6 +62,7 @@ public class SecurityConfig {
                         .permitAll()
                         .requestMatchers("/api/v1/admin/auth/login").permitAll()
                         .requestMatchers("/api/v1/admin/auth/invite/accept", "/api/v1/admin/auth/recovery/**").permitAll()
+                        .requestMatchers("/api/v1/stickers/*/asset").permitAll()
                         .requestMatchers("/api/v1/admin/**").hasAnyRole("SUPER_ADMIN", "ADMIN", "MODERATOR")
                         // /api/v1/auth/me fica de fora do permitAll acima de propósito:
                         // é o endpoint que o app usa para restaurar sessão, precisa do token.

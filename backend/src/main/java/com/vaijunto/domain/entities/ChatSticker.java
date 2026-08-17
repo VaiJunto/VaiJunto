@@ -10,6 +10,8 @@ public class ChatSticker {
  @Id @GeneratedValue(strategy = GenerationType.UUID) private UUID id;
  @Column(nullable = false, unique = true) private String code;
  @Column(nullable = false) private String label;
+ @Column(name = "storage_key", nullable = false) private String storageKey;
+ @Column(name = "content_type", nullable = false) private String contentType;
  @Column(nullable = false) private boolean active;
  @Column(name = "created_at", nullable = false) private OffsetDateTime createdAt;
 }

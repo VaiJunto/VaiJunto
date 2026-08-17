@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -212,6 +213,211 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
   }
 
   Future<void> _searchUsers() => _refresh();
+  Future<void> _createStickerWithAsset() async {
+    final code = TextEditingController();
+    final label = TextEditingController();
+    PlatformFile? asset;
+    final ok = await showDialog<bool>(
+        context: context,
+        builder: (context) => StatefulBuilder(
+            builder: (context, setDialog) => AlertDialog(
+                    title: const Text('Cadastrar figurinha'),
+                    content: SizedBox(
+                        width: 460,
+                        child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                  'Uma reação visual para o chat. PNG, JPG, WEBP ou GIF animado, até 2 MB.'),
+                              const SizedBox(height: 16),
+                              TextField(
+                                  controller: label,
+                                  decoration: const InputDecoration(
+                                      labelText: 'Nome da figurinha',
+                                      hintText: 'Ex.: Comemorando')),
+                              const SizedBox(height: 12),
+                              TextField(
+                                  controller: code,
+                                  decoration: const InputDecoration(
+                                      labelText: 'Código interno',
+                                      hintText: 'Ex.: comemorando_01')),
+                              const SizedBox(height: 16),
+                              OutlinedButton.icon(
+                                  onPressed: () async {
+                                    final result = await FilePicker.platform
+                                        .pickFiles(
+                                            type: FileType.custom,
+                                            allowedExtensions: const [
+                                              'png',
+                                              'jpg',
+                                              'jpeg',
+                                              'webp',
+                                              'gif'
+                                            ],
+                                            withData: true);
+                                    if (result != null)
+                                      setDialog(
+                                          () => asset = result.files.single);
+                                  },
+                                  icon: const Icon(Icons.upload_file_outlined),
+                                  label: Text(asset == null
+                                      ? 'ESCOLHER ARQUIVO'
+                                      : 'TROCAR ARQUIVO')),
+                              if (asset != null)
+                                Padding(
+                                    padding: const EdgeInsets.only(top: 12),
+                                    child: Row(children: [
+                                      if (asset!.bytes != null)
+                                        ClipRRect(
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                            child: Image.memory(asset!.bytes!,
+                                                width: 64,
+                                                height: 64,
+                                                fit: BoxFit.cover)),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                          child: Text(
+                                              '${asset!.name}\n${(asset!.size / 1024).toStringAsFixed(0)} KB'))
+                                    ]))
+                            ])),
+                    actions: [
+                      TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('Cancelar')),
+                      FilledButton(
+                          onPressed: asset == null
+                              ? null
+                              : () => Navigator.pop(context, true),
+                          child: const Text('Salvar'))
+                    ])));
+    if (ok == true && asset?.bytes != null)
+      try {
+        await ref.read(dioProvider).post('/admin/stickers',
+            data: FormData.fromMap({
+              'code': code.text.trim(),
+              'label': label.text.trim(),
+              'asset':
+                  MultipartFile.fromBytes(asset!.bytes!, filename: asset!.name)
+            }));
+        await _refresh();
+      } on DioException catch (e) {
+        _showError(_message(e, 'Não foi possível cadastrar a figurinha.'));
+      } finally {
+        code.dispose();
+        label.dispose();
+      }
+  }
+
+  Future<void> _createTagWithFile() async {
+    final name = TextEditingController();
+    const colors = [
+      Color(0xFF00AEEF),
+      Color(0xFFE91E63),
+      Color(0xFF9C27B0),
+      Color(0xFF673AB7),
+      Color(0xFF3F51B5),
+      Color(0xFF009688),
+      Color(0xFF4CAF50),
+      Color(0xFFFF9800),
+      Color(0xFFF44336),
+      Color(0xFF795548),
+      Color(0xFF607D8B),
+      Color(0xFF111827)
+    ];
+    Color color = colors.first;
+    PlatformFile? icon;
+    final ok = await showDialog<bool>(
+        context: context,
+        builder: (context) => StatefulBuilder(
+            builder: (context, setDialog) => AlertDialog(
+                    title: const Text('Criar tag de pessoa'),
+                    content: SizedBox(
+                        width: 460,
+                        child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              TextField(
+                                  controller: name,
+                                  decoration: const InputDecoration(
+                                      labelText: 'Nome da tag',
+                                      hintText: 'Ex.: Motorista parceiro')),
+                              const SizedBox(height: 18),
+                              const Text('Cor da tag'),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                  spacing: 10,
+                                  runSpacing: 10,
+                                  children: colors
+                                      .map((item) => InkWell(
+                                          onTap: () =>
+                                              setDialog(() => color = item),
+                                          borderRadius:
+                                              BorderRadius.circular(24),
+                                          child: Container(
+                                              width: 34,
+                                              height: 34,
+                                              decoration: BoxDecoration(
+                                                  color: item,
+                                                  shape: BoxShape.circle,
+                                                  border: Border.all(
+                                                      color: color == item
+                                                          ? Colors.white
+                                                          : Colors.transparent,
+                                                      width: 3)))))
+                                      .toList()),
+                              const SizedBox(height: 18),
+                              OutlinedButton.icon(
+                                  onPressed: () async {
+                                    final result = await FilePicker.platform
+                                        .pickFiles(
+                                            type: FileType.custom,
+                                            allowedExtensions: const ['svg'],
+                                            withData: true);
+                                    if (result != null)
+                                      setDialog(
+                                          () => icon = result.files.single);
+                                  },
+                                  icon: const Icon(Icons.attach_file),
+                                  label: Text(icon == null
+                                      ? 'ANEXAR ÍCONE SVG'
+                                      : 'TROCAR ÍCONE SVG')),
+                              if (icon != null)
+                                Padding(
+                                    padding: const EdgeInsets.only(top: 8),
+                                    child: Text(icon!.name,
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.bold)))
+                            ])),
+                    actions: [
+                      TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('Cancelar')),
+                      FilledButton(
+                          onPressed: icon == null
+                              ? null
+                              : () => Navigator.pop(context, true),
+                          child: const Text('Salvar'))
+                    ])));
+    if (ok == true && icon?.bytes != null)
+      try {
+        final svg = String.fromCharCodes(icon!.bytes!);
+        await ref.read(dioProvider).post('/admin/tags', data: {
+          'name': name.text.trim(),
+          'color':
+              '#${color.value.toRadixString(16).substring(2).toUpperCase()}',
+          'iconSvg': svg.trim()
+        });
+        await _refresh();
+      } on DioException catch (e) {
+        _showError(_message(e, 'Não foi possível criar a tag.'));
+      } finally {
+        name.dispose();
+      }
+  }
+
   Future<void> _createSticker() async {
     final code = TextEditingController();
     final label = TextEditingController();
@@ -347,7 +553,7 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
                                   .toList())),
                   actions: [
                     TextButton(
-                        onPressed: () => _createTag(),
+                        onPressed: () => _createTagWithFile(),
                         child: const Text('NOVA TAG')),
                     FilledButton(
                         onPressed: () => Navigator.pop(context),
@@ -468,88 +674,204 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
       context: context,
       builder: (context) => AlertDialog(
               title: Text(user['fullName']?.toString() ?? 'Pessoa'),
-              content: const Text('Escolha uma ação para esta pessoa.'),
-              actions: [
-                TextButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _sendNewsletter(user);
-                    },
-                    child: const Text('NEWSLETTER')),
-                TextButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _manageTags(user);
-                    },
-                    child: const Text('TAGS')),
-                FilledButton(
-                    onPressed: () {
+              content: SizedBox(
+                  width: 460,
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(user['email']?.toString() ?? '',
+                            style: TextStyle(
+                                color:
+                                    Theme.of(context).colorScheme.secondary))),
+                    const SizedBox(height: 8),
+                    const Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                            'Escolha uma ação. Todas ficam registradas no histórico administrativo.')),
+                    const SizedBox(height: 16),
+                    _personActionButton(
+                        Icons.chat_bubble_outline,
+                        'Abrir chat administrativo',
+                        'Converse com esta pessoa pelo canal oficial do painel.',
+                        () {
                       Navigator.pop(context);
                       _openAdminChat(user);
-                    },
-                    child: const Text('CHAT ADMIN'))
+                    }),
+                    _personActionButton(Icons.sell_outlined, 'Gerenciar tags',
+                        'Adicione ou remova identificadores visuais do perfil.',
+                        () {
+                      Navigator.pop(context);
+                      _manageTags(user);
+                    }),
+                    _personActionButton(
+                        Icons.campaign_outlined,
+                        'Enviar newsletter',
+                        'Envie uma comunicação sem possibilidade de resposta.',
+                        () {
+                      Navigator.pop(context);
+                      _sendNewsletter(user);
+                    }),
+                  ])),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Fechar'))
               ]));
+
+  Widget _personActionButton(IconData icon, String title, String description,
+          VoidCallback onTap) =>
+      Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: OutlinedButton(
+              onPressed: onTap,
+              style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.all(14),
+                  alignment: Alignment.centerLeft),
+              child: Row(children: [
+                Icon(icon),
+                const SizedBox(width: 12),
+                Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      Text(title,
+                          style: const TextStyle(fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 2),
+                      Text(description, style: const TextStyle(fontSize: 12))
+                    ]))
+              ])));
 
   Future<void> _createAdmin() async {
     final email = TextEditingController();
     final password = TextEditingController();
-    String role = 'ADMIN';
-    final result = await showDialog<Map<String, String>>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Novo administrador'),
-          content: SizedBox(
-              width: 420,
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                TextField(
-                    controller: email,
-                    decoration: const InputDecoration(labelText: 'E-mail')),
-                const SizedBox(height: 12),
-                TextField(
-                    controller: password,
-                    obscureText: true,
-                    decoration: const InputDecoration(
-                        labelText: 'Senha inicial (mín. 12 caracteres)')),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                    value: role,
-                    items: const [
-                      DropdownMenuItem(
-                          value: 'ADMIN', child: Text('Administrador')),
-                      DropdownMenuItem(
-                          value: 'MODERATOR', child: Text('Moderador'))
-                    ],
-                    onChanged: (v) => setDialogState(() => role = v!),
-                    decoration: const InputDecoration(labelText: 'Função')),
-              ])),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancelar')),
-            FilledButton(
-                onPressed: () => Navigator.pop(context, {
-                      'email': email.text.trim(),
-                      'password': password.text,
-                      'role': role
-                    }),
-                child: const Text('Criar e gerar TOTP')),
-          ],
-        ),
-      ),
-    );
+    Map<String, dynamic>? created;
+    await showDialog<void>(
+        context: context,
+        builder: (dialogContext) {
+          String role = 'ADMIN';
+          String? error;
+          bool saving = false;
+          return StatefulBuilder(
+              builder: (context, setDialogState) => AlertDialog(
+                      title: const Text('Criar acesso administrativo'),
+                      content: SizedBox(
+                          width: 480,
+                          child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                    'A pessoa receberá um acesso protegido por senha e TOTP. Escolha somente o nível necessário.'),
+                                const SizedBox(height: 16),
+                                TextField(
+                                    controller: email,
+                                    keyboardType: TextInputType.emailAddress,
+                                    decoration: InputDecoration(
+                                        labelText: 'E-mail do responsável',
+                                        errorText: error != null &&
+                                                email.text.trim().isEmpty
+                                            ? 'Informe o e-mail.'
+                                            : null)),
+                                const SizedBox(height: 12),
+                                TextField(
+                                    controller: password,
+                                    obscureText: true,
+                                    decoration: InputDecoration(
+                                        labelText: 'Senha inicial',
+                                        helperText:
+                                            'Use pelo menos 12 caracteres.',
+                                        errorText: error != null &&
+                                                password.text.length < 12
+                                            ? 'A senha precisa ter 12 caracteres.'
+                                            : null)),
+                                const SizedBox(height: 16),
+                                DropdownButtonFormField<String>(
+                                    value: role,
+                                    items: const [
+                                      DropdownMenuItem(
+                                          value: 'ADMIN',
+                                          child: Text('Administrador')),
+                                      DropdownMenuItem(
+                                          value: 'MODERATOR',
+                                          child: Text('Moderador'))
+                                    ],
+                                    onChanged: saving
+                                        ? null
+                                        : (value) => setDialogState(() {
+                                              role = value!;
+                                              error = null;
+                                            }),
+                                    decoration: const InputDecoration(
+                                        labelText: 'Nível de acesso')),
+                                const SizedBox(height: 12),
+                                Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .surfaceContainerHighest,
+                                        borderRadius: BorderRadius.circular(8)),
+                                    child: Text(role == 'ADMIN'
+                                        ? 'Administrador: gerencia pessoas, tags, comunicações, figurinhas e contas administrativas. Não pode criar Super Admin.'
+                                        : 'Moderador: cuida de denúncias e da segurança das pessoas. Não cria contas, tags ou configurações do sistema.')),
+                                if (error != null)
+                                  Padding(
+                                      padding: const EdgeInsets.only(top: 12),
+                                      child: Text(error!,
+                                          style: TextStyle(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .error,
+                                              fontWeight: FontWeight.w700)))
+                              ])),
+                      actions: [
+                        TextButton(
+                            onPressed:
+                                saving ? null : () => Navigator.pop(context),
+                            child: const Text('Cancelar')),
+                        FilledButton(
+                            onPressed: saving
+                                ? null
+                                : () async {
+                                    if (email.text.trim().isEmpty ||
+                                        password.text.length < 12) {
+                                      setDialogState(() => error =
+                                          'Revise os campos destacados antes de criar o acesso.');
+                                      return;
+                                    }
+                                    setDialogState(() {
+                                      saving = true;
+                                      error = null;
+                                    });
+                                    try {
+                                      final response = await ref
+                                          .read(dioProvider)
+                                          .post('/admin/accounts', data: {
+                                        'email': email.text.trim(),
+                                        'password': password.text,
+                                        'role': role
+                                      });
+                                      created =
+                                          response.data as Map<String, dynamic>;
+                                      if (context.mounted)
+                                        Navigator.pop(context);
+                                    } on DioException catch (e) {
+                                      setDialogState(() {
+                                        saving = false;
+                                        error = _message(e,
+                                            'Não foi possível criar o acesso. Confira os dados e tente novamente.');
+                                      });
+                                    }
+                                  },
+                            child: Text(
+                                saving ? 'Criando...' : 'Criar e gerar TOTP'))
+                      ]));
+        });
     email.dispose();
     password.dispose();
-    if (result == null) return;
-    try {
-      final response =
-          await ref.read(dioProvider).post('/admin/accounts', data: result);
-      if (!mounted) return;
-      await _showTotp(response.data as Map<String, dynamic>);
-      await _refresh();
-    } on DioException catch (e) {
-      _showError(_message(e, 'Não foi possível criar o administrador.'));
-    }
+    if (created == null || !mounted) return;
+    await _showTotp(created!);
+    await _refresh();
   }
 
   Future<void> _showTotp(Map<String, dynamic> data) => showDialog<void>(
@@ -779,7 +1101,9 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
           .toList(),
       action: _superAdmin || widget.role == 'ADMIN'
           ? NeoButton(
-              height: 38, onPressed: _createTag, child: const Text('NOVA TAG'))
+              height: 38,
+              onPressed: _createTagWithFile,
+              child: const Text('NOVA TAG'))
           : null);
   Widget _reportsCard(ColorScheme scheme) => _card(
       scheme,
@@ -804,7 +1128,7 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
       action: _superAdmin || widget.role == 'ADMIN'
           ? NeoButton(
               height: 38,
-              onPressed: _createSticker,
+              onPressed: _createStickerWithAsset,
               child: const Text('NOVA FIGURINHA'))
           : null);
   Widget _adminsCard(ColorScheme scheme) => _card(
