@@ -830,8 +830,7 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
                                     spacing: 8,
                                     children: attachments
                                         .map((attachment) => InputChip(
-                                            avatar: const Icon(
-                                                Icons.attachment,
+                                            avatar: const Icon(Icons.attachment,
                                                 size: 16),
                                             label: Text(
                                                 attachment['fileName']
@@ -933,8 +932,7 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
       final response = await ref.read(dioProvider).post('/admin/media',
           data: FormData.fromMap({
             'category': 'ADMIN_MESSAGE',
-            'file':
-                MultipartFile.fromBytes(file!.bytes!, filename: file.name)
+            'file': MultipartFile.fromBytes(file!.bytes!, filename: file.name)
           }));
       return {
         'mediaId': response.data['mediaId'].toString(),
@@ -1935,20 +1933,33 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
     final meta = _sectionMeta(_section);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-        Expanded(
+        ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: compact ? 330 : 460),
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(meta.code, style: _systemText(scheme)),
-          const SizedBox(height: 4),
-          Text(meta.title,
-              style: Theme.of(context)
-                  .textTheme
-                  .headlineSmall
-                  ?.copyWith(fontSize: compact ? 25 : 31)),
-          const SizedBox(height: 6),
-          Text(meta.description,
-              style: TextStyle(color: scheme.onSurfaceVariant))
-        ])),
+              Text(meta.code, style: _systemText(scheme)),
+              const SizedBox(height: 4),
+              Text(meta.title,
+                  style: Theme.of(context)
+                      .textTheme
+                      .headlineSmall
+                      ?.copyWith(fontSize: compact ? 25 : 31)),
+              const SizedBox(height: 6),
+              Text(meta.description,
+                  style: TextStyle(color: scheme.onSurfaceVariant))
+            ])),
+        // A corrida geométrica vive só no vazio do cabeçalho: uma faixa
+        // fechada entre o título e as ações, nunca atrás de texto ou lista.
+        const SizedBox(width: 20),
+        Expanded(
+            child: Container(
+                height: compact ? 84 : 96,
+                decoration: BoxDecoration(
+                    color: scheme.surface,
+                    border: Border.all(
+                        color: scheme.ink, width: NeoBrutal.borderWidth)),
+                child: const ClipRect(
+                    child: NeoGeometryRunBackdrop(scale: 0.58)))),
         if (_sectionAction() case final action?) ...[
           const SizedBox(width: 16),
           SizedBox(width: compact ? 156 : 190, child: action)
@@ -2006,24 +2017,12 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
                       Text(_loading ? 'SINCRONIZANDO' : 'ATUALIZADO',
                           style: _systemText(scheme))
                     ])),
-                // A corrida geométrica fica atrás da lista: preenche o vazio
-                // quando há poucos registros e some sob as linhas (opacas)
-                // quando a lista enche. O título da seção está fora do card,
-                // então continua sobre fundo limpo.
                 Expanded(
-                    child: ClipRRect(
-                        borderRadius: const BorderRadius.vertical(
-                            bottom: Radius.circular(3)),
-                        child: Stack(children: [
-                          const Positioned.fill(
-                              child: NeoGeometryRunBackdrop()),
-                          Positioned.fill(
-                              child: _loading && meta.count == 0
-                                  ? const Center(
-                                      child: NeoLoadingIndicator(
-                                          label: 'CARREGANDO REGISTROS'))
-                                  : _sectionList(scheme))
-                        ])))
+                    child: _loading && meta.count == 0
+                        ? const Center(
+                            child: NeoLoadingIndicator(
+                                label: 'CARREGANDO REGISTROS'))
+                        : _sectionList(scheme))
               ])))
     ]);
   }
@@ -2308,7 +2307,9 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
         destructive: true);
     if (confirmed != true) return;
     try {
-      await ref.read(dioProvider).post('/admin/newsletters/${item['id']}/cancel');
+      await ref
+          .read(dioProvider)
+          .post('/admin/newsletters/${item['id']}/cancel');
       await _refresh();
     } on DioException catch (e) {
       _showError(_message(e, 'Não foi possível cancelar a newsletter.'));

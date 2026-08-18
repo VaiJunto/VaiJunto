@@ -41,9 +41,15 @@ double? debugGeometryRunDistance;
 /// que o cubo sempre passa limpo, em qualquer taxa de quadros, e que a pose
 /// congelada (`disableAnimations`) continua coerente.
 class NeoGeometryRunBackdrop extends StatefulWidget {
-  const NeoGeometryRunBackdrop({super.key, this.animate = true});
+  const NeoGeometryRunBackdrop(
+      {super.key, this.animate = true, this.scale = 1});
 
   final bool animate;
+
+  /// Fator de desenho do percurso. Abaixo de 1 o mundo inteiro (bloco, cubo,
+  /// altura de salto) encolhe, então uma faixa baixa — o cabeçalho — ainda
+  /// cabe o salto inteiro sem cortar o cubo no topo.
+  final double scale;
 
   @override
   State<NeoGeometryRunBackdrop> createState() => _NeoGeometryRunBackdropState();
@@ -101,6 +107,7 @@ class _NeoGeometryRunBackdropState extends State<NeoGeometryRunBackdrop>
             action: scheme.primary,
             accent: scheme.secondary,
             distance: distance,
+            scale: widget.scale,
           ),
           size: Size.infinite,
         ),
@@ -156,7 +163,8 @@ _Obstacle? _obstacleForSlot(int slot) {
   final kind = h % 100;
   if (kind < 12) return null; // respiro: trecho limpo
 
-  final (int widthTiles, double height, int spikes, bool block) = switch (kind) {
+  final (int widthTiles, double height, int spikes, bool block) =
+      switch (kind) {
     < 42 => (1, _tile, 1, false),
     < 60 => (2, _tile, 2, false),
     < 70 => (3, _tile, 3, false),
@@ -186,6 +194,7 @@ class _GeometryRunPainter extends CustomPainter {
     required this.action,
     required this.accent,
     required this.distance,
+    required this.scale,
   });
 
   final Color ink;
@@ -193,11 +202,16 @@ class _GeometryRunPainter extends CustomPainter {
   final Color action;
   final Color accent;
   final double distance;
+  final double scale;
 
   @override
   void paint(Canvas canvas, Size size) {
     if (size.isEmpty) return;
     canvas.clipRect(Offset.zero & size);
+    if (scale != 1) {
+      canvas.scale(scale);
+      size = size / scale;
+    }
 
     final ground = size.height - (size.height * 0.14).clamp(34.0, 78.0);
     final cubeX = math.min(size.width * 0.2, 150.0);
@@ -397,6 +411,7 @@ class _GeometryRunPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _GeometryRunPainter oldDelegate) =>
       oldDelegate.distance != distance ||
+      oldDelegate.scale != scale ||
       oldDelegate.ink != ink ||
       oldDelegate.signal != signal ||
       oldDelegate.action != action ||

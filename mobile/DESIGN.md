@@ -146,8 +146,10 @@ de rota usa `ColorScheme.ink`.
 
 ### Corrida geométrica (só painel administrativo)
 
-- `NeoGeometryRunBackdrop` ocupa o vazio da lista do painel de operações
-  quando há poucos registros. É o único lugar com movimento contínuo grande.
+- `NeoGeometryRunBackdrop` ocupa a faixa vazia do cabeçalho do painel de
+  operações, entre o título e os botões de ação. É o único lugar com movimento
+  contínuo grande, e fica sempre dentro de uma caixa com borda — nunca atrás
+  de texto, lista ou da tela inteira.
 - O percurso não é um loop: cada obstáculo vem de um hash do índice do bloco,
   que só cresce. Não há frame de emenda porque nada volta ao início — em 15
   minutos passam ~2.750 blocos sem repetir trecho.
@@ -281,8 +283,8 @@ Reutilizar antes de desenhar algo novo:
 - `NeoFlowHeader` / `NeoRouteReview` — etapas curtas dos fluxos de publicação.
 - `NeoStreetBackdrop` — grid técnico discreto atrás da área autenticada.
 - `NeoAuthBackdrop` — scanner lento e escuro exclusivo da autenticação.
-- `NeoGeometryRunBackdrop` — corrida geométrica infinita atrás da lista do
-  painel administrativo.
+- `NeoGeometryRunBackdrop` — corrida geométrica infinita na faixa do cabeçalho
+  do painel administrativo.
 - `AuthVisualShell` — estrutura de confirmação de e-mail e fluxos auxiliares.
 - `NeoLoadingIndicator` / `NeoBootRail` — loading em células e boot da sessão.
 - `NeoBrutal.decoration(...)` — única forma de criar borda+sombra manual.
