@@ -35,6 +35,11 @@ O projeto possui um script automatizado [`dev.ps1`](file:///r:/Dev/VaiJunto/dev.
 .\dev.ps1 -Web -SkipBackend
 ```
 
+### 5. Parar o Backend em Execução (Porta 8080)
+```powershell
+.\dev.ps1 -StopBackend
+```
+
 ---
 
 ## 📋 Pré-requisitos e Versões Exatas

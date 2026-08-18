@@ -18,21 +18,41 @@
     Conecta o backend local ao banco de PRODUCAO via tunel SSH (127.0.0.1:5433).
     Desativa automaticamente as migrations do Flyway por seguranca.
 
+.PARAMETER StopBackend
+    Finaliza o processo do backend Spring Boot que estiver rodando na porta 8080.
+
 .EXAMPLE
     .\dev.ps1              # build + instala no device + abre
     .\dev.ps1 -Web         # roda no Chrome com hot reload
     .\dev.ps1 -Web -RemoteDb # roda no Chrome conectando ao banco de PRODUCAO
+    .\dev.ps1 -StopBackend # para o backend que esta rodando em segundo plano
 #>
 param(
     [switch]$Web,
     [switch]$SkipBackend,
-    [switch]$RemoteDb
+    [switch]$RemoteDb,
+    [switch]$StopBackend
 )
 
 $ErrorActionPreference = "Stop"
 
 $Root       = $PSScriptRoot
 $UserDev    = "$env:USERPROFILE\dev"
+
+if ($StopBackend) {
+    Write-Host "=> Parando o backend..." -ForegroundColor Cyan
+    $pids = Get-NetTCPConnection -LocalPort 8080 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique
+    if ($pids) {
+        foreach ($p in $pids) {
+            Stop-Process -Id $p -Force -ErrorAction SilentlyContinue
+        }
+        Write-Host "   Backend parado com sucesso!" -ForegroundColor Green
+    } else {
+        Get-Process java -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+        Write-Host "   Nenhum processo escutando na porta 8080." -ForegroundColor Yellow
+    }
+    return
+}
 
 # Busca dinâmica das ferramentas no perfil do usuário atual, PATH ou fallback Gabriel
 $FlutterBin = if (Test-Path "$UserDev\flutter\bin") { "$UserDev\flutter\bin" } elseif (Get-Command flutter -ErrorAction SilentlyContinue) { Split-Path (Get-Command flutter).Source } else { "$UserDev\flutter\bin" }
