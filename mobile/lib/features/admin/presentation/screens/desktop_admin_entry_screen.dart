@@ -3,9 +3,11 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/app_version.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/network/api_exception.dart';
 import '../../../../core/storage/secure_storage.dart';
 import '../../../../core/theme/neo_brutal_theme.dart';
 import '../../../../core/ui/neo_button.dart';
@@ -749,7 +751,7 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
                         icon: Icons.forum_outlined,
                         code: 'VJ//ADMIN_CHANNEL',
                         title:
-                            'CHAT • ${(user['fullName'] ?? 'PESSOA').toString().toUpperCase()}'),
+                            'ADMIN • ${(user['fullName'] ?? 'PESSOA').toString().toUpperCase()}'),
                     content: SizedBox(
                         width: 620,
                         height: 510,
@@ -934,12 +936,13 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
     final result = await FilePicker.platform.pickFiles(withData: true);
     final files = result?.files ?? const <PlatformFile>[];
     final file = files.isEmpty ? null : files.first;
-    if (file?.bytes == null) return null;
+    if (file == null || file.bytes == null) return null;
     try {
       final response = await ref.read(dioProvider).post('/admin/media',
           data: FormData.fromMap({
             'category': 'ADMIN_MESSAGE',
-            'file': MultipartFile.fromBytes(file!.bytes!, filename: file.name)
+            'contentType': _contentTypeFor(file),
+            'file': MultipartFile.fromBytes(file.bytes!, filename: file.name)
           }));
       return {
         'mediaId': response.data['mediaId'].toString(),
@@ -949,6 +952,22 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
       _showError(_message(e, 'Não foi possível enviar o anexo.'));
       return null;
     }
+  }
+
+  String _contentTypeFor(PlatformFile file) {
+    final extension = (file.extension ?? '').toLowerCase();
+    return switch (extension) {
+      'png' => 'image/png',
+      'jpg' || 'jpeg' => 'image/jpeg',
+      'webp' => 'image/webp',
+      'gif' => 'image/gif',
+      'mp4' => 'video/mp4',
+      'mov' => 'video/quicktime',
+      'mp3' => 'audio/mpeg',
+      'm4a' => 'audio/mp4',
+      'wav' => 'audio/wav',
+      _ => 'application/octet-stream'
+    };
   }
 
   Widget _adminChatBubble(dynamic m) {
@@ -994,19 +1013,31 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
           borderRadius: BorderRadius.circular(NeoBrutal.borderRadius),
           child: Image.network(url, height: 160, fit: BoxFit.cover));
     }
-    return Row(mainAxisSize: MainAxisSize.min, children: [
-      Icon(
-          contentType.startsWith('audio/')
-              ? Icons.graphic_eq
-              : contentType.startsWith('video/')
-                  ? Icons.movie_outlined
-                  : Icons.attachment,
-          size: 16,
-          color: scheme.tertiary),
-      const SizedBox(width: 6),
-      Text(contentType.isEmpty ? 'anexo' : contentType,
-          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700))
-    ]);
+    return InkWell(
+        onTap: url.isEmpty
+            ? null
+            : () =>
+                launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+        child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(
+                  contentType.startsWith('audio/')
+                      ? Icons.graphic_eq
+                      : contentType.startsWith('video/')
+                          ? Icons.movie_outlined
+                          : Icons.attachment,
+                  size: 16,
+                  color: scheme.tertiary),
+              const SizedBox(width: 6),
+              Text(contentType.isEmpty ? 'anexo' : contentType,
+                  style: const TextStyle(
+                      fontSize: 11, fontWeight: FontWeight.w700)),
+              if (url.isNotEmpty) ...[
+                const SizedBox(width: 6),
+                const Icon(Icons.open_in_new, size: 14)
+              ]
+            ])));
   }
 
   Future<List<dynamic>> _loadAdminMessages(String conversationId) async =>
@@ -2929,11 +2960,13 @@ Future<T?> _showAdminDialog<T>({
 }
 
 String _message(DioException error, String fallback) {
-  final data = error.response?.data;
-  if (data is Map && data['message'] is String) {
-    return data['message'] as String;
+  final apiError = ApiException.fromDio(error);
+  if (error.response != null && apiError.code == null) {
+    return apiError.correlationId == null
+        ? fallback
+        : '$fallback (ref. ${apiError.correlationId})';
   }
-  return fallback;
+  return apiError.toString();
 }
 
 Color _tagColor(String? value) =>

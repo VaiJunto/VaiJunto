@@ -57,6 +57,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
   @override
   void initState() {
     super.initState();
+    _text.addListener(_refreshComposer);
     Future.microtask(() async {
       await ref.read(offlineMessageQueueProvider).flush();
       _pendingOffline = await ref
@@ -94,6 +95,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
 
   @override
   void dispose() {
+    _text.removeListener(_refreshComposer);
     _text.dispose();
     _liveLocationSubscription?.cancel();
     _typingSubscription?.cancel();
@@ -103,6 +105,10 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     _liveLocationTimer?.cancel();
     _recorder.dispose();
     super.dispose();
+  }
+
+  void _refreshComposer() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _send() async {
@@ -321,7 +327,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     try {
       final mediaId = await ref.read(mediaRepositoryProvider).uploadChatImage(
           widget.conversation.id, image, image.mimeType ?? 'image/jpeg');
-      _mediaIds.add(mediaId);
+      if (mounted) setState(() => _mediaIds.add(mediaId));
       if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(const SnackBar(content: Text('FOTO ENVIADA')));
@@ -352,7 +358,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
         final id = await ref.read(mediaRepositoryProvider).uploadChatMedia(
             widget.conversation.id, video, video.mimeType ?? 'video/mp4',
             durationSeconds: 20);
-        _mediaIds.add(id);
+        if (mounted) setState(() => _mediaIds.add(id));
       } catch (_) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -383,7 +389,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
       final id = await ref.read(mediaRepositoryProvider).uploadChatMedia(
           widget.conversation.id, XFile(file.path), 'video/mp4',
           durationSeconds: duration);
-      _mediaIds.add(id);
+      if (mounted) setState(() => _mediaIds.add(id));
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('VÍDEO PRONTO PARA ENVIAR')));
@@ -541,17 +547,117 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
       final id = await ref.read(mediaRepositoryProvider).uploadChatMedia(
           widget.conversation.id, file, 'audio/mp4',
           durationSeconds: seconds);
-      _mediaIds.add(id);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('ÁUDIO PRONTO PARA ENVIAR')));
-      }
+      if (mounted) setState(() => _mediaIds.add(id));
+      await _send();
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Não foi possível enviar o áudio.')));
       }
     }
+  }
+
+  Future<void> _showAttachmentMenu() async {
+    final action = await showModalBottomSheet<String>(
+        context: context,
+        builder: (_) => SafeArea(
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+              ListTile(
+                  leading: const Icon(Icons.photo_camera_outlined),
+                  title: const Text('FOTO'),
+                  onTap: () => Navigator.pop(context, 'photo')),
+              ListTile(
+                  leading: const Icon(Icons.video_library_outlined),
+                  title: const Text('VÍDEO'),
+                  onTap: () => Navigator.pop(context, 'video')),
+              ListTile(
+                  leading: const Icon(Icons.emoji_emotions_outlined),
+                  title: const Text('FIGURINHA'),
+                  onTap: () => Navigator.pop(context, 'sticker')),
+              ListTile(
+                  leading: const Icon(Icons.my_location_rounded),
+                  title: const Text('LOCALIZAÇÃO'),
+                  onTap: () => Navigator.pop(context, 'location'))
+            ])));
+    switch (action) {
+      case 'photo':
+        await _pickPhoto();
+        break;
+      case 'video':
+        await _pickVideo();
+        break;
+      case 'sticker':
+        await _pickSticker();
+        break;
+      case 'location':
+        await _chooseLocation();
+        break;
+      default:
+        break;
+    }
+  }
+
+  String get _conversationTag => switch (widget.conversation.type) {
+        'ADMINISTRATIVE' => 'ADMIN',
+        'OFFICIAL' => 'OFICIAL',
+        'RIDE' => 'CARONA',
+        'PROPOSAL' => 'PROPOSTA',
+        _ => 'CONVERSA'
+      };
+
+  Widget _mediaAttachment(ChatMedia media, bool mine, ColorScheme scheme) {
+    final mediaUrl = ref.watch(mediaDownloadUrlProvider(media.id));
+    final color = mine ? Colors.white : scheme.secondary;
+    if (media.isImage) {
+      return mediaUrl.when(
+          data: (url) => ClipRRect(
+              borderRadius: BorderRadius.circular(3),
+              child: Image.network(url,
+                  fit: BoxFit.cover,
+                  height: 150,
+                  width: 230,
+                  errorBuilder: (_, __, ___) => SizedBox(
+                      height: 150,
+                      width: 230,
+                      child: Center(
+                          child: TextButton(
+                              onPressed: () => ref.invalidate(
+                                  mediaDownloadUrlProvider(media.id)),
+                              child: const Text('RECARREGAR FOTO')))))),
+          loading: () => const SizedBox(
+              height: 48, child: Center(child: Text('CARREGANDO FOTO...'))),
+          error: (_, __) => TextButton(
+              onPressed: () =>
+                  ref.invalidate(mediaDownloadUrlProvider(media.id)),
+              child: const Text('TENTAR FOTO NOVAMENTE')));
+    }
+    return mediaUrl.when(
+        data: (url) => InkWell(
+            onTap: () =>
+                launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+            child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 5),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(
+                      media.isVideo
+                          ? Icons.play_circle_outline
+                          : Icons.mic_none,
+                      color: color),
+                  const SizedBox(width: 6),
+                  Text(media.isVideo ? 'ABRIR VÍDEO' : 'ABRIR ÁUDIO',
+                      style: TextStyle(
+                          color: color,
+                          fontFamily: 'IBMPlexMono',
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800)),
+                  const SizedBox(width: 5),
+                  Icon(Icons.open_in_new, size: 14, color: color)
+                ]))),
+        loading: () => Text('CARREGANDO ANEXO...',
+            style: TextStyle(color: color, fontSize: 10)),
+        error: (_, __) => TextButton(
+            onPressed: () => ref.invalidate(mediaDownloadUrlProvider(media.id)),
+            child: const Text('TENTAR ANEXO NOVAMENTE')));
   }
 
   @override
@@ -593,17 +699,24 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                             })
                       ]
                     : null,
-            title:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(widget.conversation.title.toUpperCase()),
-              Text(
-                  widget.conversation.type == 'OFFICIAL'
-                      ? 'VJ//OFICIAL'
-                      : 'VJ//RIDE_CHAT',
-                  style: TextStyle(
-                      fontFamily: 'IBMPlexMono',
-                      fontSize: 9,
-                      color: scheme.tertiary))
+            title: Row(children: [
+              Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  color: scheme.secondary,
+                  child: Text(_conversationTag,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontFamily: 'IBMPlexMono',
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: .7))),
+              const SizedBox(width: 8),
+              Text('•', style: TextStyle(color: scheme.tertiary)),
+              const SizedBox(width: 8),
+              Expanded(
+                  child: Text(widget.conversation.title.toUpperCase(),
+                      maxLines: 1, overflow: TextOverflow.ellipsis))
             ])),
         body: Column(children: [
           if (widget.conversation.readOnly)
@@ -694,12 +807,6 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                       itemBuilder: (_, i) {
                         final message = items[i];
                         final mine = message.senderId == me;
-                        final firstMedia =
-                            message.media.isEmpty ? null : message.media.first;
-                        final mediaUrl = firstMedia == null
-                            ? null
-                            : ref
-                                .watch(mediaDownloadUrlProvider(firstMedia.id));
                         return Align(
                             alignment: mine
                                 ? Alignment.centerRight
@@ -796,63 +903,26 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                                                     : scheme.secondary)
                                           ],
                                           if (message.mediaIds.isNotEmpty) ...[
-                                            const SizedBox(height: 8),
-                                            if (firstMedia != null &&
-                                                firstMedia.isImage)
-                                              mediaUrl!.when(
-                                                  data: (url) => ClipRRect(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                              3),
-                                                      child: Image.network(url,
-                                                          fit: BoxFit.cover,
-                                                          height: 150,
-                                                          width: 230,
-                                                          errorBuilder: (_, __, ___) => SizedBox(
-                                                              height: 150,
-                                                              width: 230,
-                                                              child: Center(
-                                                                  child: TextButton(
-                                                                      onPressed:
-                                                                          () =>
-                                                                              ref.invalidate(mediaDownloadUrlProvider(firstMedia.id)),
-                                                                      child: const Text('RECARREGAR FOTO')))))),
-                                                  loading: () => const SizedBox(height: 48, child: Center(child: Text('CARREGANDO FOTO...'))),
-                                                  error: (_, __) => TextButton(onPressed: () => ref.invalidate(mediaDownloadUrlProvider(firstMedia.id)), child: const Text('TENTAR FOTO NOVAMENTE'))),
-                                            if (firstMedia != null &&
-                                                !firstMedia.isImage)
-                                              InkWell(
-                                                  onTap: () => mediaUrl?.whenData(
-                                                      (url) => launchUrl(
-                                                          Uri.parse(url),
-                                                          mode: LaunchMode
-                                                              .externalApplication)),
-                                                  child: Row(children: [
-                                                    Icon(
-                                                        firstMedia.isVideo
-                                                            ? Icons
-                                                                .play_circle_outline
-                                                            : Icons.mic_none,
-                                                        color: mine
-                                                            ? Colors.white
-                                                            : scheme.secondary),
-                                                    const SizedBox(width: 6),
-                                                    Text(
-                                                        firstMedia.isVideo
-                                                            ? 'VÍDEO ANEXADO'
-                                                            : 'ÁUDIO ANEXADO',
-                                                        style: TextStyle(
-                                                            color: mine
-                                                                ? Colors.white
-                                                                : scheme
-                                                                    .secondary,
-                                                            fontFamily:
-                                                                'IBMPlexMono',
-                                                            fontSize: 10,
-                                                            fontWeight:
-                                                                FontWeight
-                                                                    .w800))
-                                                  ])),
+                                            for (final media
+                                                in message.media) ...[
+                                              const SizedBox(height: 8),
+                                              _mediaAttachment(
+                                                  media, mine, scheme)
+                                            ],
+                                            if (message.media.isEmpty)
+                                              Padding(
+                                                  padding: const EdgeInsets
+                                                      .only(top: 8),
+                                                  child: Text(
+                                                      'ANEXO INDISPONÍVEL',
+                                                      style: TextStyle(
+                                                          color: mine
+                                                              ? Colors.white
+                                                              : scheme
+                                                                  .secondary,
+                                                          fontFamily:
+                                                              'IBMPlexMono',
+                                                          fontSize: 10))),
                                             const SizedBox(height: 8),
                                             Text(
                                                 '${message.mediaIds.length} ANEXO${message.mediaIds.length == 1 ? '' : 'S'}',
@@ -885,70 +955,106 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                 top: false,
                 child: Padding(
                     padding: const EdgeInsets.all(12),
-                    child: Row(children: [
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
                       if (_replyToId != null)
-                        Expanded(
-                            child: Text('Respondendo: $_replyPreview',
-                                maxLines: 1))
-                      else
-                        const SizedBox.shrink(),
-                      IconButton(
-                          onPressed: _pickPhoto,
-                          icon: const Icon(Icons.add_rounded)),
-                      IconButton(
-                          tooltip: 'Enviar vídeo',
-                          onPressed: _pickVideo,
-                          icon: const Icon(Icons.video_library_outlined)),
-                      IconButton(
-                          tooltip: 'Figurinhas',
-                          onPressed: _pickSticker,
-                          icon: const Icon(Icons.emoji_emotions_outlined)),
-                      IconButton(
-                          tooltip: 'Enviar localização',
-                          onPressed: _chooseLocation,
-                          icon: const Icon(Icons.my_location_rounded)),
-                      GestureDetector(
-                          onLongPressStart: (_) => _startRecording(),
-                          onLongPressMoveUpdate: (details) {
-                            if (!_recording) return;
-                            if (details.offsetFromOrigin.dy < -56) {
-                              setState(() => _recordLocked = true);
-                            }
-                            if (details.offsetFromOrigin.dx < -80) {
-                              setState(() => _recordCanceled = true);
-                            }
-                          },
-                          onLongPressEnd: (_) {
-                            if (!_recordLocked) {
-                              _stopRecording(discard: _recordCanceled);
-                            }
-                          },
-                          child: Icon(_recording
-                              ? (_recordLocked ? Icons.lock : Icons.mic)
-                              : Icons.mic_none)),
-                      if (_recording && _recordLocked)
+                        Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Row(children: [
+                              Expanded(
+                                  child: Text('Respondendo: $_replyPreview',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis)),
+                              IconButton(
+                                  tooltip: 'Cancelar resposta',
+                                  onPressed: () => setState(() {
+                                        _replyToId = null;
+                                        _replyPreview = null;
+                                      }),
+                                  icon: const Icon(Icons.close, size: 18))
+                            ])),
+                      if (_mediaIds.isNotEmpty)
+                        Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Row(children: [
+                              Icon(Icons.attachment,
+                                  size: 16, color: scheme.secondary),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                  child: Text(
+                                      '${_mediaIds.length} ANEXO${_mediaIds.length == 1 ? '' : 'S'} PRONTO${_mediaIds.length == 1 ? '' : 'S'} PARA ENVIAR',
+                                      style: const TextStyle(
+                                          fontFamily: 'IBMPlexMono',
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w800))),
+                              IconButton(
+                                  tooltip: 'Remover anexos',
+                                  onPressed: () =>
+                                      setState(() => _mediaIds.clear()),
+                                  icon: const Icon(Icons.close, size: 18))
+                            ])),
+                      Row(children: [
                         IconButton(
-                            tooltip: 'Concluir áudio',
-                            onPressed: _stopRecording,
-                            icon: const Icon(Icons.send_rounded)),
-                      Expanded(
-                          child: TextField(
-                              controller: _text,
-                              maxLength: 4000,
-                              onChanged: (value) => ref
-                                  .read(stompClientProvider)
-                                  .sendTyping(
-                                      widget.conversation.id, value.isNotEmpty),
-                              onSubmitted: (_) => _send(),
-                              decoration: const InputDecoration(
-                                  counterText: '',
-                                  hintText: 'Escreva uma mensagem'))),
-                      const SizedBox(width: 8),
-                      SizedBox(
-                          width: 92,
-                          child: NeoButton(
-                              onPressed: _sending ? null : _send,
-                              child: Text(_sending ? '◉' : 'ENVIAR')))
+                            tooltip: 'Adicionar anexo',
+                            onPressed: _showAttachmentMenu,
+                            icon: const Icon(Icons.add_rounded)),
+                        Expanded(
+                            child: TextField(
+                                controller: _text,
+                                maxLength: 4000,
+                                onChanged: (value) => ref
+                                    .read(stompClientProvider)
+                                    .sendTyping(widget.conversation.id,
+                                        value.isNotEmpty),
+                                onSubmitted: (_) => _send(),
+                                decoration: const InputDecoration(
+                                    counterText: '',
+                                    hintText: 'Escreva uma mensagem'))),
+                        const SizedBox(width: 8),
+                        if (_text.text.trim().isEmpty && _mediaIds.isEmpty)
+                          GestureDetector(
+                              onLongPressStart: (_) => _startRecording(),
+                              onLongPressMoveUpdate: (details) {
+                                if (!_recording) return;
+                                if (details.offsetFromOrigin.dy < -56) {
+                                  setState(() => _recordLocked = true);
+                                }
+                                if (details.offsetFromOrigin.dx < -80) {
+                                  setState(() => _recordCanceled = true);
+                                }
+                              },
+                              onLongPressEnd: (_) {
+                                if (!_recordLocked) {
+                                  _stopRecording(discard: _recordCanceled);
+                                }
+                              },
+                              child: Container(
+                                  width: 56,
+                                  height: 52,
+                                  alignment: Alignment.center,
+                                  decoration: NeoBrutal.decoration(
+                                      color: scheme.primary,
+                                      borderColor: scheme.ink),
+                                  child: Icon(
+                                      _recording
+                                          ? (_recordLocked
+                                              ? Icons.lock
+                                              : Icons.mic)
+                                          : Icons.mic_none,
+                                      color: Colors.white)))
+                        else
+                          SizedBox(
+                              width: 92,
+                              child: NeoButton(
+                                  onPressed: _sending ? null : _send,
+                                  child: Text(_sending ? '◉' : 'ENVIAR'))),
+                        if (_recording && _recordLocked) ...[
+                          const SizedBox(width: 8),
+                          IconButton(
+                              tooltip: 'Concluir áudio',
+                              onPressed: _stopRecording,
+                              icon: const Icon(Icons.send_rounded))
+                        ]
+                      ])
                     ])))
         ]));
   }

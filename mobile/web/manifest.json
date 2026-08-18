@@ -1,6 +1,7 @@
 {
     "name": "VaiJunto",
     "short_name": "VaiJunto",
+    "id": "/",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#F3F0E8",

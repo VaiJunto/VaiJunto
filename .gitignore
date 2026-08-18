@@ -2,3 +2,5 @@ backend-dev.log
 backend-dev.err.log
 flutter-web-dev.log
 flutter-web-dev.err.log
+firebase-service-account*.json
+secrets/

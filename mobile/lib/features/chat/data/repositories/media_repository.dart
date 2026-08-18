@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/network/api_client.dart';
@@ -20,6 +21,17 @@ class MediaRepository {
   Future<String> uploadChatMedia(
       String conversationId, XFile file, String contentType,
       {int? durationSeconds}) async {
+    if (kIsWeb) {
+      final response = await _dio.post('/media/upload',
+          data: FormData.fromMap({
+            'conversationId': conversationId,
+            'contentType': contentType,
+            if (durationSeconds != null) 'durationSeconds': durationSeconds,
+            'file': MultipartFile.fromBytes(await file.readAsBytes(),
+                filename: file.name),
+          }));
+      return response.data['mediaId'] as String;
+    }
     return _uploadChatMedia(conversationId, file, contentType,
         durationSeconds: durationSeconds, retries: 1);
   }

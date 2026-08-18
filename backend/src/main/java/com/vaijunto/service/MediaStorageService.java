@@ -84,6 +84,33 @@ public class MediaStorageService {
         object.setStatus("ACTIVE");
     }
 
+    /**
+     * Recebe os bytes pelo backend para clientes web. O fluxo por URL
+     * temporaria continua disponivel para os aplicativos nativos, mas no
+     * navegador ele dependeria da configuracao de CORS do bucket.
+     */
+    @Transactional
+    public UUID uploadChatMedia(String email, UUID conversationId, String contentType,
+                                long sizeBytes, Integer durationSeconds, byte[] content) {
+        User user = users.findByEmail(email).orElseThrow(ApiException::userNotFound);
+        Conversation conversation = conversations.findById(conversationId)
+                .orElseThrow(() -> bad("CONVERSATION_NOT_FOUND", "Conversa não encontrada."));
+        if (!participant(conversation, user)) throw ApiException.conversationForbidden();
+
+        String type = contentType == null ? "" : contentType.toLowerCase(Locale.ROOT);
+        validate(new MediaUploadIntentRequest("CHAT", conversationId, type, sizeBytes, durationSeconds));
+        requireR2();
+        ensureCapacity(sizeBytes);
+
+        String key = "chat/" + user.getId() + "/" + UUID.randomUUID();
+        clients.getObject().putObject(PutObjectRequest.builder().bucket(r2.bucket()).key(key)
+                        .contentType(type).contentLength(sizeBytes).build(),
+                software.amazon.awssdk.core.sync.RequestBody.fromBytes(content));
+        return media.save(MediaObject.builder().owner(user).conversation(conversation)
+                .storageKey(key).category("CHAT").contentType(type).sizeBytes(sizeBytes)
+                .durationSeconds(durationSeconds).status("ACTIVE").build()).getId();
+    }
+
     @Transactional(readOnly = true)
     public MediaDownloadUrlDto downloadUrl(UUID id, String email) {
         User user = users.findByEmail(email).orElseThrow(ApiException::userNotFound);

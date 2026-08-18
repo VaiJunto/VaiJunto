@@ -47,9 +47,17 @@ class ApiClient {
         return handler.next(options);
       },
       onError: (DioException e, handler) {
+        final correlationId = e.response?.headers.value('x-correlation-id') ??
+            e.requestOptions.extra['correlationId'];
         developer.log(
-          'API request failed: ${e.requestOptions.method} ${e.requestOptions.uri.path} status=${e.response?.statusCode} code=${e.response?.data is Map ? e.response?.data['code'] : null} correlationId=${e.requestOptions.extra['correlationId']}',
+          'API request failed: method=${e.requestOptions.method} '
+          'url=${e.requestOptions.uri} type=${e.type.name} '
+          'status=${e.response?.statusCode} correlationId=$correlationId '
+          'response=${e.response?.data}',
           name: 'ApiClient',
+          level: 1000,
+          error: e.error ?? e,
+          stackTrace: e.stackTrace,
         );
         // Tratar erros globais de autenticação (ex: 401)
         if (e.response?.statusCode == 401) {

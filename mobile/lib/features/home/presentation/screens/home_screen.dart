@@ -1,11 +1,15 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/config/campus.dart';
+import '../../../../core/platform/pwa_environment.dart';
+import '../../../../core/storage/secure_storage.dart';
 import '../../../../core/theme/neo_brutal_theme.dart';
 import '../../../../core/ui/neo_avatar.dart';
 import '../../../../core/ui/neo_bottom_nav_bar.dart';
+import '../../../../core/ui/neo_card.dart';
 import '../../../../core/ui/neo_street_backdrop.dart';
 import '../../../auth/data/models/user_model.dart';
 import '../../../chat/presentation/screens/chat_screen.dart';
@@ -23,6 +27,8 @@ import '../../../notifications/data/services/notification_service.dart';
 import '../../../notifications/presentation/notification_destination_resolver.dart';
 import '../../../tracking/data/services/stomp_client_service.dart';
 import '../../../chat/presentation/providers/conversation_provider.dart';
+
+enum _NotificationPrompt { hidden, installPwa, enable, denied }
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key, required this.user});
@@ -49,6 +55,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   StreamSubscription<Map<String, dynamic>>? _foregroundPushSubscription;
   Timer? _fallbackTimer;
   AppLifecycleState _lifecycle = AppLifecycleState.resumed;
+  _NotificationPrompt _notificationPrompt = _NotificationPrompt.hidden;
+
+  static const _notificationPromptDismissedKey =
+      'notification_prompt_dismissed_at';
 
   @override
   void initState() {
@@ -60,6 +70,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Future<void> _startLiveUpdates() async {
     final notifications = ref.read(notificationServiceProvider);
     await notifications.init();
+    await _refreshNotificationPrompt();
     if (!mounted) return;
     _pushSubscription = notifications.openedMessages.listen((data) {
       if (mounted) NotificationDestinationResolver.navigate(context, ref, data);
@@ -100,8 +111,73 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     _lifecycle = state;
     if (state == AppLifecycleState.resumed) {
       _refreshAll();
+      _refreshNotificationPrompt(ignoreCooldown: true);
       ref.read(stompClientProvider).connect();
     }
+  }
+
+  Future<void> _refreshNotificationPrompt({bool ignoreCooldown = false}) async {
+    final storage = ref.read(secureStorageProvider);
+    if (!ignoreCooldown) {
+      final raw = await storage.readPrivate(_notificationPromptDismissedKey);
+      final dismissedAt = raw == null ? null : DateTime.tryParse(raw);
+      if (dismissedAt != null &&
+          DateTime.now().isBefore(dismissedAt.add(const Duration(hours: 24)))) {
+        return;
+      }
+    }
+
+    final prompt = kIsWeb && isIosBrowser && !isRunningAsInstalledPwa
+        ? _NotificationPrompt.installPwa
+        : switch (
+            await ref.read(notificationServiceProvider).permissionState()) {
+            NotificationPermissionState.enabled ||
+            NotificationPermissionState.unavailable =>
+              _NotificationPrompt.hidden,
+            NotificationPermissionState.notDetermined =>
+              _NotificationPrompt.enable,
+            NotificationPermissionState.denied => _NotificationPrompt.denied,
+          };
+    if (mounted) setState(() => _notificationPrompt = prompt);
+  }
+
+  Future<void> _dismissNotificationPrompt() async {
+    await ref.read(secureStorageProvider).writePrivate(
+        _notificationPromptDismissedKey, DateTime.now().toIso8601String());
+    if (mounted) {
+      setState(() => _notificationPrompt = _NotificationPrompt.hidden);
+    }
+  }
+
+  Future<void> _handleNotificationPrompt() async {
+    if (_notificationPrompt == _NotificationPrompt.enable) {
+      final enabled =
+          await ref.read(notificationServiceProvider).enablePushNotifications();
+      await _refreshNotificationPrompt(ignoreCooldown: true);
+      if (mounted && enabled) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Notificações ativadas.')));
+      }
+      return;
+    }
+
+    final installing = _notificationPrompt == _NotificationPrompt.installPwa;
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(
+            installing ? 'ADICIONE À TELA DE INÍCIO' : 'ATIVE NOS AJUSTES'),
+        content: Text(installing
+            ? 'No Safari, toque em Compartilhar e depois em “Adicionar à Tela de Início”. Abra o VaiJunto pelo novo ícone para ativar os avisos.'
+            : 'Abra Ajustes > Notificações > VaiJunto no iPhone e permita os avisos.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('ENTENDI')),
+        ],
+      ),
+    );
   }
 
   @override
@@ -235,6 +311,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         children: [
           const NeoStreetBackdrop(),
           IndexedStack(index: _currentIndex, children: pages),
+          if (_notificationPrompt != _NotificationPrompt.hidden)
+            Positioned(
+              top: 12,
+              left: 12,
+              right: 12,
+              child: _buildNotificationPrompt(scheme),
+            ),
         ],
       ),
       bottomNavigationBar: NeoBottomNavBar(
@@ -247,6 +330,61 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         backgroundColor: scheme.primary,
         foregroundColor: Colors.white,
         child: const Icon(Icons.add_rounded),
+      ),
+    );
+  }
+
+  Widget _buildNotificationPrompt(ColorScheme scheme) {
+    final installing = _notificationPrompt == _NotificationPrompt.installPwa;
+    final denied = _notificationPrompt == _NotificationPrompt.denied;
+    return NeoCard(
+      color: scheme.secondaryContainer,
+      padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
+      offset: NeoBrutal.shadowOffsetSmall,
+      child: Row(
+        children: [
+          Icon(installing
+              ? Icons.install_mobile_rounded
+              : Icons.notifications_active_outlined),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  installing
+                      ? 'INSTALE O VAIJUNTO'
+                      : denied
+                          ? 'NOTIFICAÇÕES BLOQUEADAS'
+                          : 'NÃO PERCA NENHUM AVISO',
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  installing
+                      ? 'Adicione à Tela de Início para receber notificações.'
+                      : denied
+                          ? 'Libere as notificações nos Ajustes do iPhone.'
+                          : 'Ative para receber pedidos e mensagens.',
+                  style: const TextStyle(fontSize: 12),
+                ),
+                TextButton(
+                  onPressed: _handleNotificationPrompt,
+                  child: Text(installing
+                      ? 'COMO INSTALAR'
+                      : denied
+                          ? 'COMO LIBERAR'
+                          : 'ATIVAR'),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: 'Lembrar depois',
+            onPressed: _dismissNotificationPrompt,
+            icon: const Icon(Icons.close_rounded),
+          ),
+        ],
       ),
     );
   }
