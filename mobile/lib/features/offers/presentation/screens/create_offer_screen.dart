@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../core/config/campus.dart';
 import '../../../../core/geocoding/geocoding_result_model.dart';
@@ -16,6 +17,7 @@ import '../providers/offer_provider.dart';
 import '../../data/models/offer_model.dart';
 import '../../../vehicles/presentation/providers/vehicle_provider.dart';
 import '../../../vehicles/data/models/vehicle_model.dart';
+import '../../../vehicles/presentation/widgets/vehicle_form_sheet.dart';
 
 class CreateOfferScreen extends ConsumerStatefulWidget {
   const CreateOfferScreen({
@@ -38,17 +40,28 @@ class _CreateOfferScreenState extends ConsumerState<CreateOfferScreen> {
   final _detailsFormKey = GlobalKey<FormState>();
   final _seatsController = TextEditingController(text: '1');
   final _priceController = TextEditingController(text: '0');
+  final _priceFocus = FocusNode();
 
   int _step = 1;
   TripDirection _direction = TripDirection.toFatec;
   GeocodingResult? _otherAddress;
   DateTime _departureAt = DateTime.now().add(const Duration(hours: 1));
   bool _isFixed = false;
+  final Set<int> _daysOfWeek = <int>{};
   VehicleModel? _vehicle;
 
   @override
   void initState() {
     super.initState();
+    _priceFocus.addListener(() {
+      if (!_priceFocus.hasFocus) {
+        final value =
+            double.tryParse(_priceController.text.replaceAll(',', '.'));
+        if (value != null) {
+          _priceController.text = value.toStringAsFixed(2).replaceAll('.', ',');
+        }
+      }
+    });
     final offer = widget.initialOffer;
     if (offer == null ||
         offer.originLocation == null ||
@@ -75,6 +88,7 @@ class _CreateOfferScreenState extends ConsumerState<CreateOfferScreen> {
   void dispose() {
     _seatsController.dispose();
     _priceController.dispose();
+    _priceFocus.dispose();
     super.dispose();
   }
 
@@ -95,6 +109,7 @@ class _CreateOfferScreenState extends ConsumerState<CreateOfferScreen> {
       setState(() {
         _departureAt = DateTime(
             today.year, today.month, today.day, time.hour, time.minute);
+        _departureAt = _nextRecurringOccurrence(_departureAt);
       });
       return;
     }
@@ -124,6 +139,10 @@ class _CreateOfferScreenState extends ConsumerState<CreateOfferScreen> {
       AppSnackbar.error(context, 'Selecione um veículo para publicar.');
       return;
     }
+    if (_isFixed && _daysOfWeek.isEmpty) {
+      AppSnackbar.error(context, 'Escolha ao menos um dia da semana.');
+      return;
+    }
 
     final other = _otherAddress!;
     final otherLocation = LocationModel(
@@ -146,8 +165,32 @@ class _CreateOfferScreenState extends ConsumerState<CreateOfferScreen> {
               double.parse(_priceController.text.trim().replaceAll(',', '.')),
           departureAt: _departureAt,
           isFixed: _isFixed,
+          daysOfWeek: _daysOfWeek.toList()..sort(),
           vehicleId: _vehicle!.id,
         );
+  }
+
+  DateTime _nextRecurringOccurrence(DateTime candidate) {
+    var value = candidate;
+    for (var i = 0; i < 8; i++) {
+      if ((_daysOfWeek.isEmpty || _daysOfWeek.contains(value.weekday)) &&
+          value.isAfter(DateTime.now())) {
+        return value;
+      }
+      value = value.add(const Duration(days: 1));
+    }
+    return value;
+  }
+
+  Future<void> _registerVehicle() async {
+    final created = await showCreateVehicleSheet(context, ref);
+    if (created == null || !mounted) return;
+    setState(() {
+      _vehicle = created;
+      if ((int.tryParse(_seatsController.text) ?? 1) > created.capacity) {
+        _seatsController.text = created.capacity.toString();
+      }
+    });
   }
 
   String? _seatsValidator(String? value) {
@@ -214,10 +257,28 @@ class _CreateOfferScreenState extends ConsumerState<CreateOfferScreen> {
               dateLabel: _dateLabel,
               seatsController: _seatsController,
               priceController: _priceController,
+              priceFocus: _priceFocus,
               seatsValidator: _seatsValidator,
               priceValidator: _priceValidator,
               isFixed: _isFixed,
-              onFixedChanged: (value) => setState(() => _isFixed = value),
+              onFixedChanged: (value) => setState(() {
+                _isFixed = value;
+                if (value && _daysOfWeek.isEmpty) {
+                  _daysOfWeek.add(DateTime.now().weekday);
+                }
+                if (value) {
+                  _departureAt = _nextRecurringOccurrence(_departureAt);
+                }
+              }),
+              daysOfWeek: _daysOfWeek,
+              onDayChanged: (day) => setState(() {
+                _daysOfWeek.contains(day)
+                    ? _daysOfWeek.remove(day)
+                    : _daysOfWeek.add(day);
+                if (_isFixed) {
+                  _departureAt = _nextRecurringOccurrence(_departureAt);
+                }
+              }),
               onEditRoute: () => setState(() => _step = 1),
               onPickDate: _pickDepartureAt,
               onSubmit: createState.isLoading ? null : _submit,
@@ -231,6 +292,7 @@ class _CreateOfferScreenState extends ConsumerState<CreateOfferScreen> {
                   _seatsController.text = value.capacity.toString();
                 }
               }),
+              onRegisterVehicle: _registerVehicle,
             ),
     );
 
@@ -261,7 +323,7 @@ class _CreateOfferScreenState extends ConsumerState<CreateOfferScreen> {
     final month = _departureAt.month.toString().padLeft(2, '0');
     final hour = _departureAt.hour.toString().padLeft(2, '0');
     final minute = _departureAt.minute.toString().padLeft(2, '0');
-    if (_isFixed) return 'HORÁRIO FIXO • $hour:$minute';
+    if (_isFixed) return 'PRÓXIMA OCORRÊNCIA • $day/$month • $hour:$minute';
     return '$day/$month/${_departureAt.year} • $hour:$minute';
   }
 }
@@ -330,10 +392,13 @@ class _OfferDetailsStep extends StatelessWidget {
     required this.dateLabel,
     required this.seatsController,
     required this.priceController,
+    required this.priceFocus,
     required this.seatsValidator,
     required this.priceValidator,
     required this.isFixed,
     required this.onFixedChanged,
+    required this.daysOfWeek,
+    required this.onDayChanged,
     required this.onEditRoute,
     required this.onPickDate,
     required this.onSubmit,
@@ -341,6 +406,7 @@ class _OfferDetailsStep extends StatelessWidget {
     required this.vehicle,
     required this.vehicles,
     required this.onVehicleChanged,
+    required this.onRegisterVehicle,
   });
 
   final GlobalKey<FormState> formKey;
@@ -349,10 +415,13 @@ class _OfferDetailsStep extends StatelessWidget {
   final String dateLabel;
   final TextEditingController seatsController;
   final TextEditingController priceController;
+  final FocusNode priceFocus;
   final FormFieldValidator<String> seatsValidator;
   final FormFieldValidator<String> priceValidator;
   final bool isFixed;
   final ValueChanged<bool> onFixedChanged;
+  final Set<int> daysOfWeek;
+  final ValueChanged<int> onDayChanged;
   final VoidCallback onEditRoute;
   final VoidCallback onPickDate;
   final VoidCallback? onSubmit;
@@ -360,6 +429,7 @@ class _OfferDetailsStep extends StatelessWidget {
   final VehicleModel? vehicle;
   final List<VehicleModel> vehicles;
   final ValueChanged<VehicleModel> onVehicleChanged;
+  final VoidCallback onRegisterVehicle;
 
   @override
   Widget build(BuildContext context) {
@@ -380,24 +450,76 @@ class _OfferDetailsStep extends StatelessWidget {
             NeoRouteReview(
                 origin: origin, destination: destination, onEdit: onEditRoute),
             const SizedBox(height: 14),
-            DropdownButtonFormField<VehicleModel>(
-              initialValue: vehicle,
-              isExpanded: true,
-              decoration: const InputDecoration(labelText: 'Veículo'),
-              hint: const Text('Cadastre um veículo para continuar'),
-              items: vehicles
-                  .map((v) => DropdownMenuItem(
-                      value: v,
-                      child: Text(
-                          '${v.model.isEmpty ? 'Veículo' : v.model} • ${v.capacity} vagas')))
-                  .toList(),
-              onChanged: (value) {
-                if (value != null) onVehicleChanged(value);
-              },
-              validator: (_) => vehicle == null ? 'Selecione um veículo' : null,
-            ),
+            if (vehicles.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.ink,
+                    width: NeoBrutal.borderWidth,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                        'Cadastre um veículo para concluir a publicação.'),
+                    const SizedBox(height: 12),
+                    NeoButton(
+                      onPressed: onRegisterVehicle,
+                      icon: const Icon(Icons.add_rounded),
+                      child: const Text('CADASTRAR VEÍCULO'),
+                    ),
+                  ],
+                ),
+              )
+            else
+              DropdownButtonFormField<VehicleModel>(
+                initialValue: vehicle,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Veículo'),
+                hint: const Text('Cadastre um veículo para continuar'),
+                items: vehicles
+                    .map((v) => DropdownMenuItem(
+                        value: v,
+                        child: Text(
+                            '${v.model.isEmpty ? 'Veículo' : v.model} • ${v.capacity} vagas')))
+                    .toList(),
+                onChanged: (value) {
+                  if (value != null) onVehicleChanged(value);
+                },
+                validator: (_) =>
+                    vehicle == null ? 'Selecione um veículo' : null,
+              ),
             const SizedBox(height: 14),
             _FixedOfferToggle(value: isFixed, onChanged: onFixedChanged),
+            if (isFixed) ...[
+              const SizedBox(height: 12),
+              Text('DIAS DA SEMANA',
+                  style: Theme.of(context).textTheme.labelMedium),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: List.generate(7, (index) {
+                  const labels = [
+                    'SEG',
+                    'TER',
+                    'QUA',
+                    'QUI',
+                    'SEX',
+                    'SÁB',
+                    'DOM'
+                  ];
+                  final day = index + 1;
+                  return FilterChip(
+                    label: Text(labels[index]),
+                    selected: daysOfWeek.contains(day),
+                    onSelected: (_) => onDayChanged(day),
+                  );
+                }),
+              ),
+            ],
             const SizedBox(height: 12),
             NeoOutlineButton(
               onPressed: onPickDate,
@@ -420,8 +542,16 @@ class _OfferDetailsStep extends StatelessWidget {
                 Expanded(
                   child: TextFormField(
                     controller: priceController,
-                    decoration:
-                        const InputDecoration(labelText: 'Valor por pessoa'),
+                    focusNode: priceFocus,
+                    decoration: const InputDecoration(
+                      labelText: 'Valor por pessoa',
+                      prefixText: 'R\$ ',
+                    ),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(
+                        RegExp(r'^\d*[\.,]?\d{0,2}'),
+                      ),
+                    ],
                     keyboardType:
                         const TextInputType.numberWithOptions(decimal: true),
                     validator: priceValidator,
@@ -469,14 +599,16 @@ class _FixedOfferToggle extends StatelessWidget {
           color: value ? Colors.white : scheme.primary,
         ),
         title: Text(
-          'CARONA FIXA',
+          value ? 'CARONA RECORRENTE' : 'CARONA ÚNICA',
           style: theme.textTheme.labelMedium?.copyWith(
             color: value ? Colors.white : scheme.ink,
             fontSize: 10,
           ),
         ),
         subtitle: Text(
-          'Para van ou fretado: continua visível depois do horário.',
+          value
+              ? 'Repete semanalmente nos dias escolhidos.'
+              : 'Acontece uma vez na data e horário escolhidos.',
           style: theme.textTheme.bodySmall?.copyWith(
             color: value
                 ? Colors.white.withValues(alpha: 0.82)

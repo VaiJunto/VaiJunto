@@ -41,16 +41,18 @@ public class OfferService {
     private final TripInstanceRepository trips;
     private final NotificationService notifications;
     private final BlockService blocks;
+    private final RealtimeEventPublisher realtimeEvents;
 
     private final GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<OfferDto> findActiveOffersNearOrigin(double lat, double lon, double distanceMeters, String email) {
         User viewer = userRepository.findByEmail(email).orElseThrow();
         List<Offer> offers = offerRepository.findActiveOffersNearOrigin(
                 lon, lat, distanceMeters, OffsetDateTime.now()
         );
 
+        offers.forEach(this::advanceRecurrence);
         return offers.stream()
                 .filter(o -> !blocks.blocked(viewer.getId(), o.getDriver().getId())).map(this::mapToDto)
                 .collect(Collectors.toList());
@@ -62,7 +64,12 @@ public class OfferService {
                 .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado"));
 
         if (request.getAvailableSeats() == null || request.getAvailableSeats() < 1) throw new IllegalArgumentException("Informe ao menos uma vaga.");
-        if (request.getDepartureAt() == null || request.getDepartureAt().isBefore(OffsetDateTime.now())) throw new IllegalArgumentException("Informe um horário futuro.");
+        boolean recurrent = Boolean.TRUE.equals(request.getIsRecurrent());
+        if (recurrent) {
+            validateRecurrence(request);
+            request.setDepartureAt(nextOccurrence(request.getDepartureTime(), request.getDaysOfWeek(), OffsetDateTime.now()));
+        }
+        if (request.getDepartureAt() == null || !request.getDepartureAt().isAfter(OffsetDateTime.now())) throw new IllegalArgumentException("Informe um horário futuro.");
         if (!hasFatecEndpoint(request.getOriginName(), request.getDestinationName())) throw new IllegalArgumentException("A Fatec deve ser origem ou destino da carona.");
         Vehicle vehicle = null;
         if (request.getVehicleId() != null) {
@@ -91,7 +98,7 @@ public class OfferService {
                 .destinationLocation(toPoint(request.getDestinationLocation()))
                 .departureTime(request.getDepartureTime())
                 .daysOfWeek(request.getDaysOfWeek())
-                .isRecurrent(request.getIsRecurrent() != null ? request.getIsRecurrent() : true)
+                .isRecurrent(recurrent)
                 .build();
         route = routeRepository.save(route);
 
@@ -103,7 +110,10 @@ public class OfferService {
                 .departureAt(request.getDepartureAt())
                 .build();
 
-        return mapToDto(offerRepository.save(offer));
+        Offer saved = offerRepository.save(offer);
+        realtimeEvents.afterCommit(allUserEmails(), com.vaijunto.dto.RealtimeEventDto.create(
+                "OFFER_CREATED", "OFFER", saved.getId(), java.util.Map.of("offerId", saved.getId().toString())));
+        return mapToDto(saved);
     }
 
     private Point toPoint(LocationDto location) {
@@ -111,17 +121,20 @@ public class OfferService {
         return geometryFactory.createPoint(new Coordinate(location.getLongitude(), location.getLatitude()));
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<OfferDto> findMine(String email) {
         User user = userRepository.findByEmail(email).orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado"));
-        return offerRepository.findByDriverIdOrderByDepartureAtAsc(user.getId()).stream().map(o -> mapToDto(o, true)).collect(Collectors.toList());
+        var mine = offerRepository.findByDriverIdOrderByDepartureAtAsc(user.getId());
+        mine.forEach(this::advanceRecurrence);
+        return mine.stream().map(o -> mapToDto(o, true)).collect(Collectors.toList());
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public com.vaijunto.dto.PageResponse<OfferDto> browse(int page, int size, String email) {
         User viewer = userRepository.findByEmail(email).orElseThrow();
         int safeSize = Math.min(Math.max(size, 1), 50);
         var result = offerRepository.findByStatusInAndDepartureAtAfterOrderByDepartureAtAsc(List.of(com.vaijunto.domain.enums.OfferStatus.ACTIVE, com.vaijunto.domain.enums.OfferStatus.FULL), OffsetDateTime.now(), org.springframework.data.domain.PageRequest.of(Math.max(page, 0), safeSize));
+        result.forEach(this::advanceRecurrence);
         var visible = result.stream().filter(o -> !blocks.blocked(viewer.getId(), o.getDriver().getId())).toList();
         return new com.vaijunto.dto.PageResponse<>(visible.stream().map(this::mapToDto).toList(), result.getNumber(), result.getSize(), visible.size(), result.getTotalPages(), result.hasNext());
     }
@@ -146,6 +159,38 @@ public class OfferService {
 
     private boolean hasFatecEndpoint(String origin, String destination) {
         return (origin != null && origin.toUpperCase().contains("FATEC")) || (destination != null && destination.toUpperCase().contains("FATEC"));
+    }
+
+    private void validateRecurrence(CreateOfferRequest request) {
+        if (request.getDepartureTime() == null) throw new IllegalArgumentException("Informe o horário da recorrência.");
+        if (request.getDaysOfWeek() == null || request.getDaysOfWeek().length == 0) {
+            throw new IllegalArgumentException("Escolha ao menos um dia da semana.");
+        }
+        if (java.util.Arrays.stream(request.getDaysOfWeek()).anyMatch(day -> day == null || day < 1 || day > 7)) {
+            throw new IllegalArgumentException("Os dias da recorrência são inválidos.");
+        }
+    }
+
+    private OffsetDateTime nextOccurrence(java.time.LocalTime time, Integer[] days, OffsetDateTime now) {
+        var selected = java.util.Set.of(days);
+        for (int offset = 0; offset <= 7; offset++) {
+            var date = now.toLocalDate().plusDays(offset);
+            var candidate = date.atTime(time).atOffset(now.getOffset());
+            if (selected.contains(date.getDayOfWeek().getValue()) && candidate.isAfter(now)) return candidate;
+        }
+        throw new IllegalArgumentException("Não foi possível calcular a próxima ocorrência.");
+    }
+
+    private void advanceRecurrence(Offer offer) {
+        Route route = offer.getRoute();
+        if (route == null || !Boolean.TRUE.equals(route.getIsRecurrent()) ||
+                offer.getDepartureAt().isAfter(OffsetDateTime.now())) return;
+        offer.setDepartureAt(nextOccurrence(route.getDepartureTime(), route.getDaysOfWeek(), OffsetDateTime.now()));
+    }
+
+    private java.util.List<String> allUserEmails() {
+        return userRepository.findAll().stream().map(User::getEmail)
+                .filter(java.util.Objects::nonNull).toList();
     }
 
     private BigDecimal assistanceLimit(CreateOfferRequest request, Vehicle vehicle) {

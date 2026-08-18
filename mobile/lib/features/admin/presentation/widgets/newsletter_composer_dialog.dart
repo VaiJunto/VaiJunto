@@ -150,6 +150,8 @@ class _NewsletterComposerState extends State<_NewsletterComposer> {
                 : ReorderableListView.builder(
                     buildDefaultDragHandles: false,
                     itemCount: _components.length,
+                    // Flutter de produção (3.35) ainda usa esta API.
+                    // ignore: deprecated_member_use
                     onReorder: _reorder,
                     itemBuilder: (context, index) =>
                         _componentCard(scheme, index, key: ValueKey(_components[index]['key'])),

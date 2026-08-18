@@ -37,8 +37,9 @@ class ApiException implements Exception {
         DioExceptionType.connectionError =>
           'Não foi possível conectar ao servidor. Verifique sua conexão.',
         _ => switch (response?.statusCode ?? 0) {
-            401 => 'E-mail ou senha incorretos.',
-            403 => 'Acesso negado.',
+            401 => 'Sua sessão expirou. Entre novamente.',
+            403 => 'Você não tem autorização para realizar esta ação.',
+            400 => 'Não foi possível concluir por uma regra da carona.',
             404 => 'Recurso não encontrado.',
             >= 500 => 'Erro no servidor. Tente novamente mais tarde.',
             _ => 'Algo deu errado. Tente novamente.',
@@ -49,5 +50,5 @@ class ApiException implements Exception {
   }
 
   @override
-  String toString() => message;
+  String toString() => code == null ? message : '$message ($code)';
 }

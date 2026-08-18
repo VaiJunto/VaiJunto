@@ -52,6 +52,7 @@ class OfferRepository {
     required double price,
     required DateTime departureAt,
     required bool isFixed,
+    required List<int> daysOfWeek,
     required String vehicleId,
   }) async {
     final response = await _dio.post(
@@ -64,6 +65,7 @@ class OfferRepository {
         'destinationLocation': destinationLocation.toJson(),
         'departureTime': _formatTimeOfDay(departureAt),
         'isRecurrent': isFixed,
+        'daysOfWeek': isFixed ? daysOfWeek : <int>[],
         'vehicleId': vehicleId,
         'availableSeats': availableSeats,
         'price': price,

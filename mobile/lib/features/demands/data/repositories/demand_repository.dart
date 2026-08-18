@@ -40,6 +40,8 @@ class DemandRepository {
         .toList();
   }
 
+  Future<void> cancelDemand(String id) => _dio.delete('/demands/$id');
+
   Future<DemandModel> createDemand({
     required String originName,
     required LocationModel originLocation,

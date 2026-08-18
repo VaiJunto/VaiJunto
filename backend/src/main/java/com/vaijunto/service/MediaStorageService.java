@@ -6,6 +6,7 @@ import com.vaijunto.domain.entities.MediaObject;
 import com.vaijunto.domain.entities.User;
 import com.vaijunto.dto.MediaUploadIntentDto;
 import com.vaijunto.dto.MediaUploadIntentRequest;
+import com.vaijunto.dto.MediaDownloadUrlDto;
 import com.vaijunto.exception.ApiException;
 import com.vaijunto.repository.ConversationRepository;
 import com.vaijunto.repository.MediaObjectRepository;
@@ -84,15 +85,17 @@ public class MediaStorageService {
     }
 
     @Transactional(readOnly = true)
-    public String downloadUrl(UUID id, String email) {
+    public MediaDownloadUrlDto downloadUrl(UUID id, String email) {
         User user = users.findByEmail(email).orElseThrow(ApiException::userNotFound);
         MediaObject object = media.findById(id).orElseThrow(() -> bad("MEDIA_NOT_FOUND", "Mídia não encontrada."));
         if (!canRead(object, user)) throw ApiException.conversationForbidden();
         if (!"ACTIVE".equals(object.getStatus())) throw bad("MEDIA_UNAVAILABLE", "Mídia indisponível.");
         requireR2();
-        return presigners.getObject().presignGetObject(GetObjectPresignRequest.builder()
+        OffsetDateTime expiresAt = OffsetDateTime.now().plusHours(1);
+        String url = presigners.getObject().presignGetObject(GetObjectPresignRequest.builder()
                 .getObjectRequest(GetObjectRequest.builder().bucket(r2.bucket()).key(object.getStorageKey()).build())
-                .signatureDuration(Duration.ofMinutes(2)).build()).url().toString();
+                .signatureDuration(Duration.ofHours(1)).build()).url().toString();
+        return new MediaDownloadUrlDto(url, expiresAt);
     }
 
     @Scheduled(cron = "${app.r2.cleanup-cron:0 0 * * * *}")

@@ -1,149 +1,199 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:stomp_dart_client/stomp.dart';
 import 'package:stomp_dart_client/stomp_config.dart';
 import 'package:stomp_dart_client/stomp_frame.dart';
+
+import '../../../../core/models/location_model.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/secure_storage.dart';
-import '../../../../core/models/location_model.dart';
 
 final stompClientProvider = Provider<StompClientService>((ref) {
-  final secureStorage = ref.watch(secureStorageProvider);
-  return StompClientService(secureStorage);
+  final service = StompClientService(ref.watch(secureStorageProvider));
+  ref.onDispose(service.dispose);
+  return service;
 });
 
+class TypingEvent {
+  const TypingEvent(this.conversationId, this.typing);
+  final String conversationId;
+  final bool typing;
+}
+
+class LiveLocationEvent {
+  const LiveLocationEvent(this.conversationId, this.latitude, this.longitude);
+  final String conversationId;
+  final double latitude;
+  final double longitude;
+}
+
+class RealtimeEvent {
+  const RealtimeEvent(
+      {required this.eventId, required this.type, required this.payload});
+  final String eventId;
+  final String type;
+  final Map<String, dynamic> payload;
+
+  factory RealtimeEvent.fromJson(Map<String, dynamic> json) => RealtimeEvent(
+        eventId: json['eventId']?.toString() ?? '',
+        type: json['type']?.toString() ?? '',
+        payload: Map<String, dynamic>.from(json['payload'] as Map? ?? const {}),
+      );
+}
+
 class StompClientService {
+  StompClientService(this._secureStorage);
   final SecureStorage _secureStorage;
-  StompClient? _stompClient;
-  final Set<String> _chatSubscriptions = <String>{};
+  StompClient? _client;
+  final _typing = StreamController<TypingEvent>.broadcast();
+  final _liveLocations = StreamController<LiveLocationEvent>.broadcast();
+  final _events = StreamController<RealtimeEvent>.broadcast();
+  final _connection = StreamController<bool>.broadcast();
+  final _tripLocations = StreamController<LocationModel>.broadcast();
+  final _seenEventIds = <String>{};
+  final _tripIds = <String>{};
+  bool _subscribedPrivateQueues = false;
 
-  Function(LocationModel)? onLocationReceived;
-  Function(String conversationId, bool typing)? onTypingReceived;
-  Function(String conversationId, double latitude, double longitude)?
-      onLiveLocationReceived;
+  Stream<TypingEvent> get typingEvents => _typing.stream;
+  Stream<LiveLocationEvent> get liveLocationEvents => _liveLocations.stream;
+  Stream<RealtimeEvent> get events => _events.stream;
+  Stream<bool> get connectionChanges => _connection.stream;
+  Stream<LocationModel> get tripLocations => _tripLocations.stream;
+  bool get isConnected => _client?.connected ?? false;
 
-  // Derivado do mesmo API_BASE_URL do ApiClient (dev: --dart-define=API_BASE_URL=
-  // http://10.0.2.2:8080/api/v1 no emulador; prod: https://api.vaijunto.app.br/api/v1),
-  // trocando o esquema http(s) -> ws(s) e o path /api/v1 -> /ws-tracking. Assim o
-  // WebSocket segue o mesmo host de produção da API REST sem precisar de outra flag.
   static String get wsUrl {
     final apiUri = Uri.parse(ApiClient.baseUrl);
-    final wsScheme = apiUri.scheme == 'https' ? 'wss' : 'ws';
-    return apiUri.replace(scheme: wsScheme, path: '/ws-tracking').toString();
+    return apiUri
+        .replace(
+          scheme: apiUri.scheme == 'https' ? 'wss' : 'ws',
+          path: '/ws-tracking',
+        )
+        .toString();
   }
 
-  StompClientService(this._secureStorage);
-
-  Future<void> connect(String tripId) async {
+  Future<void> connect([String? tripId]) async {
+    if (tripId != null) _tripIds.add(tripId);
+    if (_client?.isActive ?? false) {
+      if (tripId != null && isConnected) _subscribeTrip(tripId);
+      return;
+    }
     final token = await _secureStorage.getToken();
     if (token == null) return;
-
-    _stompClient = StompClient(
+    _client = StompClient(
       config: StompConfig.sockJS(
         url: wsUrl,
+        reconnectDelay: const Duration(seconds: 3),
+        heartbeatIncoming: const Duration(seconds: 15),
+        heartbeatOutgoing: const Duration(seconds: 15),
         stompConnectHeaders: {'Authorization': 'Bearer $token'},
         webSocketConnectHeaders: {'Authorization': 'Bearer $token'},
-        onConnect: (StompFrame frame) {
-          _subscribeToTrip(tripId);
+        onConnect: _onConnect,
+        onDisconnect: (_) {
+          _subscribedPrivateQueues = false;
+          _connection.add(false);
         },
-        onWebSocketError: (dynamic error) => developer.log(
-          'WebSocket connection failed.',
-          error: error,
-          name: 'StompClientService',
-        ),
+        onWebSocketError: (error) {
+          _connection.add(false);
+          developer.log('WebSocket connection failed.',
+              error: error, name: 'StompClientService');
+        },
       ),
-    );
-
-    _stompClient?.activate();
+    )..activate();
   }
 
-  Future<void> connectChat(String conversationId) async {
-    final token = await _secureStorage.getToken();
-    if (token == null) return;
-    _stompClient ??= StompClient(
-        config: StompConfig.sockJS(
-            url: wsUrl,
-            stompConnectHeaders: {'Authorization': 'Bearer $token'},
-            webSocketConnectHeaders: {'Authorization': 'Bearer $token'},
-            onConnect: (_) => _subscribeToChat(conversationId),
-            onWebSocketError: (_) {}));
-    if (_stompClient!.isActive) {
-      _subscribeToChat(conversationId);
-    } else {
-      _stompClient!.activate();
+  Future<void> connectChat(String conversationId) => connect();
+
+  void _onConnect(StompFrame _) {
+    _connection.add(true);
+    _subscribePrivateQueues();
+    for (final tripId in _tripIds) {
+      _subscribeTrip(tripId);
     }
   }
 
-  void _subscribeToChat(String conversationId) {
-    if (!_chatSubscriptions.add(conversationId)) return;
-    _stompClient?.subscribe(
+  void _subscribePrivateQueues() {
+    if (_subscribedPrivateQueues) return;
+    _subscribedPrivateQueues = true;
+    _client?.subscribe(
         destination: '/user/queue/chat/typing',
         callback: (frame) {
-          if (frame.body == null) return;
-          final value = json.decode(frame.body!);
-          if (onTypingReceived != null) {
-            onTypingReceived!(
-                value['conversationId'] as String, value['typing'] as bool);
+          final value = _decode(frame);
+          if (value != null) {
+            _typing.add(TypingEvent(
+                value['conversationId'].toString(), value['typing'] == true));
           }
         });
-    _stompClient?.subscribe(
+    _client?.subscribe(
         destination: '/user/queue/chat/location',
         callback: (frame) {
-          if (frame.body == null) return;
-          final value = json.decode(frame.body!) as Map<String, dynamic>;
-          onLiveLocationReceived?.call(
-              value['conversationId'] as String,
+          final value = _decode(frame);
+          if (value != null) {
+            _liveLocations.add(LiveLocationEvent(
+              value['conversationId'].toString(),
               (value['latitude'] as num).toDouble(),
-              (value['longitude'] as num).toDouble());
+              (value['longitude'] as num).toDouble(),
+            ));
+          }
+        });
+    _client?.subscribe(
+        destination: '/user/queue/events',
+        callback: (frame) {
+          final value = _decode(frame);
+          if (value == null) return;
+          final event = RealtimeEvent.fromJson(value);
+          if (event.eventId.isNotEmpty && !_seenEventIds.add(event.eventId)) {
+            return;
+          }
+          if (_seenEventIds.length > 500) {
+            _seenEventIds.remove(_seenEventIds.first);
+          }
+          _events.add(event);
         });
   }
 
-  void sendTyping(String conversationId, bool typing) {
-    if (_stompClient?.isActive ?? false) {
-      _stompClient?.send(
-          destination: '/app/chat/typing',
-          body: json
-              .encode({'conversationId': conversationId, 'typing': typing}));
+  Map<String, dynamic>? _decode(StompFrame frame) {
+    if (frame.body == null) return null;
+    try {
+      return Map<String, dynamic>.from(jsonDecode(frame.body!) as Map);
+    } catch (error) {
+      developer.log('Invalid STOMP payload.',
+          error: error, name: 'StompClientService');
+      return null;
     }
   }
+
+  void sendTyping(String conversationId, bool typing) => _send(
+      '/app/chat/typing', {'conversationId': conversationId, 'typing': typing});
 
   void sendLiveLocation(String conversationId, double latitude,
-      double longitude, DateTime expiresAt) {
-    if (_stompClient?.isActive ?? false) {
-      _stompClient?.send(
-          destination: '/app/chat/location',
-          body: json.encode({
-            'conversationId': conversationId,
-            'latitude': latitude,
-            'longitude': longitude,
-            'expiresAtEpochMs': expiresAt.millisecondsSinceEpoch,
-          }));
-    }
-  }
+          double longitude, DateTime expiresAt) =>
+      _send('/app/chat/location', {
+        'conversationId': conversationId,
+        'latitude': latitude,
+        'longitude': longitude,
+        'expiresAtEpochMs': expiresAt.millisecondsSinceEpoch,
+      });
 
-  void _subscribeToTrip(String tripId) {
-    _stompClient?.subscribe(
-      destination: '/topic/trips/$tripId/tracking',
-      callback: (StompFrame frame) {
-        if (frame.body != null) {
-          final result = json.decode(frame.body!);
-          final location = LocationModel(
-            latitude: (result['latitude'] as num).toDouble(),
-            longitude: (result['longitude'] as num).toDouble(),
-          );
-          if (onLocationReceived != null) {
-            onLocationReceived!(location);
+  void _subscribeTrip(String tripId) {
+    _client?.subscribe(
+        destination: '/topic/trips/$tripId/tracking',
+        callback: (frame) {
+          final value = _decode(frame);
+          if (value != null) {
+            _tripLocations.add(LocationModel(
+              latitude: (value['latitude'] as num).toDouble(),
+              longitude: (value['longitude'] as num).toDouble(),
+            ));
           }
-        }
-      },
-    );
+        });
   }
 
-  void sendLocationUpdate(
-      String tripId, double lat, double lon, double speed, double heading) {
-    if (_stompClient != null && _stompClient!.isActive) {
-      final payload = json.encode({
+  void sendLocationUpdate(String tripId, double lat, double lon, double speed,
+          double heading) =>
+      _send('/app/tracking/update', {
         'tripInstanceId': tripId,
         'latitude': lat,
         'longitude': lon,
@@ -151,14 +201,24 @@ class StompClientService {
         'heading': heading,
       });
 
-      _stompClient?.send(
-        destination: '/app/tracking/update',
-        body: payload,
-      );
+  void _send(String destination, Map<String, Object> payload) {
+    if (isConnected) {
+      _client?.send(destination: destination, body: jsonEncode(payload));
     }
   }
 
   void disconnect() {
-    _stompClient?.deactivate();
+    _client?.deactivate();
+    _client = null;
+    _subscribedPrivateQueues = false;
+  }
+
+  void dispose() {
+    disconnect();
+    _typing.close();
+    _liveLocations.close();
+    _events.close();
+    _connection.close();
+    _tripLocations.close();
   }
 }

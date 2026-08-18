@@ -58,7 +58,7 @@ public class Route {
 
     @Column(name = "is_recurrent", nullable = false)
     @Builder.Default
-    private Boolean isRecurrent = true;
+    private Boolean isRecurrent = false;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

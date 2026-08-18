@@ -20,6 +20,32 @@ final createDemandProvider = StateNotifierProvider.autoDispose<
   return CreateDemandNotifier(ref.watch(demandRepositoryProvider));
 });
 
+final cancelDemandProvider = StateNotifierProvider.autoDispose<
+    CancelDemandNotifier, AsyncValue<String?>>((ref) {
+  return CancelDemandNotifier(ref.watch(demandRepositoryProvider));
+});
+
+class CancelDemandNotifier extends StateNotifier<AsyncValue<String?>> {
+  CancelDemandNotifier(this._repository) : super(const AsyncValue.data(null));
+  final DemandRepository _repository;
+
+  Future<bool> cancel(String id) async {
+    if (state.isLoading) return false;
+    state = const AsyncValue.loading();
+    try {
+      await _repository.cancelDemand(id);
+      state = AsyncValue.data(id);
+      return true;
+    } on DioException catch (error, stack) {
+      state = AsyncValue.error(ApiException.fromDio(error), stack);
+      return false;
+    } catch (error, stack) {
+      state = AsyncValue.error(error, stack);
+      return false;
+    }
+  }
+}
+
 class CreateDemandNotifier extends StateNotifier<AsyncValue<DemandModel?>> {
   final DemandRepository _repository;
 

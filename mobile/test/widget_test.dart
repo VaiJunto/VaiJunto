@@ -419,6 +419,7 @@ class _AdminFixtureAdapter implements HttpClientAdapter {
       ('GET', '/admin/reports') => <Object>[],
       ('GET', '/admin/stickers') => <Object>[],
       ('GET', '/admin/tags') => <Object>[],
+      ('GET', '/admin/newsletters') => <Object>[],
       ('GET', '/admin/accounts') => <Object>[],
       (
         'POST',

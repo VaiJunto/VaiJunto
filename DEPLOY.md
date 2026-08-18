@@ -387,3 +387,25 @@ configurado ainda, então mantenha essas features atrás de um fallback
   do `application.yml`).
 - Configurar os GitHub Secrets `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY` e o
   environment `production` com o aprovador correto (se ainda não feito).
+# CORS do Cloudflare R2
+
+O upload e a leitura direta no PWA exigem CORS no bucket. Aplique uma regra
+equivalente à abaixo, trocando a origem pelo domínio publicado (não use `*` em
+produção):
+
+```json
+[
+  {
+    "AllowedOrigins": ["https://vaijunto.app.br"],
+    "AllowedMethods": ["GET", "HEAD", "PUT"],
+    "AllowedHeaders": ["Content-Type", "Content-Length", "x-amz-*"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+
+Valide o bucket em ambiente seguro com
+`R2_INTEGRATION_TEST=true mvnw test -Dtest=R2ConnectionIntegrationTest`. O app
+só conclui a intenção depois de um `PUT` bem-sucedido e o backend confirma o
+objeto com `HEAD` antes de ativá-lo.

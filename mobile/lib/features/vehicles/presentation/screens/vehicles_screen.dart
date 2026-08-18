@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/neo_brutal_theme.dart';
-import '../../../../core/ui/app_snackbar.dart';
 import '../../../../core/ui/neo_button.dart';
 import '../../../../core/ui/neo_card.dart';
 import '../../data/repositories/vehicle_repository.dart';
 import '../providers/vehicle_provider.dart';
+import '../widgets/vehicle_form_sheet.dart';
 
 class VehiclesScreen extends ConsumerWidget {
   const VehiclesScreen({super.key});
@@ -117,24 +117,7 @@ class VehiclesScreen extends ConsumerWidget {
   }
 
   Future<void> _openForm(BuildContext context, WidgetRef ref) async {
-    final draft = await showModalBottomSheet<_VehicleDraft>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const _VehicleFormSheet(),
-    );
-    if (draft == null) return;
-
-    try {
-      await ref.read(vehicleRepositoryProvider).create(
-            plate: draft.plate,
-            model: draft.model,
-            capacity: draft.capacity,
-          );
-      ref.invalidate(vehiclesProvider);
-    } catch (error) {
-      if (context.mounted) AppSnackbar.error(context, error.toString());
-    }
+    await showCreateVehicleSheet(context, ref);
   }
 }
 

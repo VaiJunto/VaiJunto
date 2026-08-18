@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:developer' as developer;
+import 'dart:math';
 import '../storage/secure_storage.dart';
 
 final dioProvider = Provider<Dio>((ref) {
@@ -32,6 +34,10 @@ class ApiClient {
 
     dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
+        final correlationId =
+            '${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}-${Random.secure().nextInt(1 << 32).toRadixString(36)}';
+        options.headers['X-Correlation-Id'] = correlationId;
+        options.extra['correlationId'] = correlationId;
         final token = options.path.startsWith('/admin')
             ? await _secureStorage.getAdminToken()
             : await _secureStorage.getToken();
@@ -41,6 +47,10 @@ class ApiClient {
         return handler.next(options);
       },
       onError: (DioException e, handler) {
+        developer.log(
+          'API request failed: ${e.requestOptions.method} ${e.requestOptions.uri.path} status=${e.response?.statusCode} code=${e.response?.data is Map ? e.response?.data['code'] : null} correlationId=${e.requestOptions.extra['correlationId']}',
+          name: 'ApiClient',
+        );
         // Tratar erros globais de autenticação (ex: 401)
         if (e.response?.statusCode == 401) {
           _secureStorage.clearAll();

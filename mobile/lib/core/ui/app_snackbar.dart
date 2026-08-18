@@ -14,7 +14,7 @@ extension _SnackKindStyle on _SnackKind {
       };
 
   Color background() => switch (this) {
-        _SnackKind.success => NeoBrutal.lime,
+        _SnackKind.success => const Color(0xFF168A45),
         _SnackKind.error => const Color(0xFFFF3B3B),
         _SnackKind.info => NeoBrutal.cyan,
       };
@@ -34,6 +34,7 @@ class AppSnackbar {
 
   static void _show(BuildContext context, String message, _SnackKind kind) {
     final ink = Theme.of(context).colorScheme.ink;
+    final foreground = kind == _SnackKind.success ? Colors.white : ink;
 
     ScaffoldMessenger.of(context)
       // Evita empilhar mensagens quando o usuário toca várias vezes.
@@ -49,13 +50,15 @@ class AppSnackbar {
             ),
             child: Row(
               children: [
-                Icon(kind.icon, color: ink, size: 20),
+                Icon(kind.icon, color: foreground, size: 20),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     message,
                     style: TextStyle(
-                        color: ink, fontSize: 14, fontWeight: FontWeight.w700),
+                        color: foreground,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700),
                   ),
                 ),
               ],

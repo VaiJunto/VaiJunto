@@ -23,7 +23,10 @@ public interface OfferRepository extends JpaRepository<Offer, UUID> {
     long countByDriverIdAndStatusIn(UUID driverId, java.util.Collection<com.vaijunto.domain.enums.OfferStatus> statuses);
     @Query(value = "SELECT EXISTS(SELECT 1 FROM offers WHERE driver_id = :driverId AND status IN ('ACTIVE','FULL') AND departure_at BETWEEN :from AND :to)", nativeQuery = true)
     boolean existsOverlappingOffer(@Param("driverId") UUID driverId, @Param("from") OffsetDateTime from, @Param("to") OffsetDateTime to);
-    Page<Offer> findByStatusInAndDepartureAtAfterOrderByDepartureAtAsc(java.util.Collection<com.vaijunto.domain.enums.OfferStatus> statuses, OffsetDateTime from, Pageable pageable);
+    @Query("select o from Offer o join o.route r where o.status in :statuses and (r.isRecurrent = true or o.departureAt > :from) order by o.departureAt asc")
+    Page<Offer> findByStatusInAndDepartureAtAfterOrderByDepartureAtAsc(
+            @Param("statuses") java.util.Collection<com.vaijunto.domain.enums.OfferStatus> statuses,
+            @Param("from") OffsetDateTime from, Pageable pageable);
 
     @Query(value = "SELECT o.* FROM offers o " +
             "JOIN routes r ON o.route_id = r.id " +

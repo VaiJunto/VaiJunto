@@ -10,6 +10,7 @@ import 'package:video_compress/video_compress.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/neo_brutal_theme.dart';
@@ -43,6 +44,10 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
   DateTime? _recordingStartedAt;
   bool _otherTyping = false;
   StreamSubscription<Position>? _liveLocationSubscription;
+  StreamSubscription<TypingEvent>? _typingSubscription;
+  StreamSubscription<LiveLocationEvent>? _incomingLocationSubscription;
+  StreamSubscription<RealtimeEvent>? _realtimeSubscription;
+  Timer? _fallbackPollTimer;
   Timer? _liveLocationTimer;
   DateTime? _liveLocationEndsAt;
   String? _otherLiveLocation;
@@ -60,17 +65,30 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
       if (mounted) setState(() {});
       ref.invalidate(conversationMessagesProvider(widget.conversation.id));
       final socket = ref.read(stompClientProvider);
-      socket.onTypingReceived = (conversationId, typing) {
-        if (mounted && conversationId == widget.conversation.id) {
-          setState(() => _otherTyping = typing);
+      _typingSubscription = socket.typingEvents.listen((event) {
+        if (mounted && event.conversationId == widget.conversation.id) {
+          setState(() => _otherTyping = event.typing);
         }
-      };
-      socket.onLiveLocationReceived = (conversationId, latitude, longitude) {
-        if (mounted && conversationId == widget.conversation.id) {
-          setState(() => _otherLiveLocation = '$latitude,$longitude');
+      });
+      _incomingLocationSubscription = socket.liveLocationEvents.listen((event) {
+        if (mounted && event.conversationId == widget.conversation.id) {
+          setState(() =>
+              _otherLiveLocation = '${event.latitude},${event.longitude}');
         }
-      };
+      });
+      _realtimeSubscription = socket.events.listen((event) {
+        if (event.payload['conversationId']?.toString() ==
+            widget.conversation.id) {
+          ref.invalidate(conversationMessagesProvider(widget.conversation.id));
+          ref.invalidate(conversationsProvider);
+        }
+      });
       await socket.connectChat(widget.conversation.id);
+      _fallbackPollTimer = Timer.periodic(const Duration(seconds: 12), (_) {
+        if (!socket.isConnected && mounted) {
+          ref.invalidate(conversationMessagesProvider(widget.conversation.id));
+        }
+      });
     });
   }
 
@@ -78,6 +96,10 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
   void dispose() {
     _text.dispose();
     _liveLocationSubscription?.cancel();
+    _typingSubscription?.cancel();
+    _incomingLocationSubscription?.cancel();
+    _realtimeSubscription?.cancel();
+    _fallbackPollTimer?.cancel();
     _liveLocationTimer?.cancel();
     _recorder.dispose();
     super.dispose();
@@ -289,8 +311,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     final image = await ImagePicker().pickImage(
         source: source, imageQuality: 82, maxWidth: 1280, maxHeight: 1280);
     if (image == null) return;
-    final file = File(image.path);
-    if (await file.length() > 5 * 1024 * 1024) {
+    if (await image.length() > 5 * 1024 * 1024) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text('A foto precisa ter no máximo 5 MB.')));
@@ -299,7 +320,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     }
     try {
       final mediaId = await ref.read(mediaRepositoryProvider).uploadChatImage(
-          widget.conversation.id, file, image.mimeType ?? 'image/jpeg');
+          widget.conversation.id, image, image.mimeType ?? 'image/jpeg');
       _mediaIds.add(mediaId);
       if (mounted) {
         ScaffoldMessenger.of(context)
@@ -319,6 +340,27 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     final video = await ImagePicker()
         .pickVideo(source: source, maxDuration: const Duration(seconds: 20));
     if (video == null) return;
+    if (kIsWeb) {
+      if (await video.length() > 15 * 1024 * 1024) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Vídeo deve ter no máximo 15 MB.')));
+        }
+        return;
+      }
+      try {
+        final id = await ref.read(mediaRepositoryProvider).uploadChatMedia(
+            widget.conversation.id, video, video.mimeType ?? 'video/mp4',
+            durationSeconds: 20);
+        _mediaIds.add(id);
+      } catch (_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('Não foi possível enviar o vídeo.')));
+        }
+      }
+      return;
+    }
     final compressed = await VideoCompress.compressVideo(video.path,
         quality: VideoQuality.MediumQuality,
         deleteOrigin: false,
@@ -339,7 +381,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
         throw StateError('limit');
       }
       final id = await ref.read(mediaRepositoryProvider).uploadChatMedia(
-          widget.conversation.id, file, 'video/mp4',
+          widget.conversation.id, XFile(file.path), 'video/mp4',
           durationSeconds: duration);
       _mediaIds.add(id);
       if (mounted) {
@@ -488,10 +530,12 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
       });
     }
     if (path == null || seconds > 120 || discard || _recordCanceled) {
-      if (path != null) await File(path).delete().catchError((_) => File(path));
+      if (path != null && !kIsWeb) {
+        await File(path).delete().catchError((_) => File(path));
+      }
       return;
     }
-    final file = File(path);
+    final file = XFile(path);
     if (await file.length() > 3 * 1024 * 1024) return;
     try {
       final id = await ref.read(mediaRepositoryProvider).uploadChatMedia(
@@ -763,14 +807,18 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                                                       child: Image.network(url,
                                                           fit: BoxFit.cover,
                                                           height: 150,
-                                                          width: 230)),
-                                                  loading: () => const SizedBox(
-                                                      height: 48,
-                                                      child: Center(
-                                                          child: Text(
-                                                              'CARREGANDO FOTO...'))),
-                                                  error: (_, __) =>
-                                                      const Text('FOTO INDISPONÍVEL')),
+                                                          width: 230,
+                                                          errorBuilder: (_, __, ___) => SizedBox(
+                                                              height: 150,
+                                                              width: 230,
+                                                              child: Center(
+                                                                  child: TextButton(
+                                                                      onPressed:
+                                                                          () =>
+                                                                              ref.invalidate(mediaDownloadUrlProvider(firstMedia.id)),
+                                                                      child: const Text('RECARREGAR FOTO')))))),
+                                                  loading: () => const SizedBox(height: 48, child: Center(child: Text('CARREGANDO FOTO...'))),
+                                                  error: (_, __) => TextButton(onPressed: () => ref.invalidate(mediaDownloadUrlProvider(firstMedia.id)), child: const Text('TENTAR FOTO NOVAMENTE'))),
                                             if (firstMedia != null &&
                                                 !firstMedia.isImage)
                                               InkWell(

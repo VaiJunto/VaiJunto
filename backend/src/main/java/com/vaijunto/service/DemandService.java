@@ -25,6 +25,7 @@ public class DemandService {
 
     private final DemandRepository demandRepository;
     private final UserRepository userRepository;
+    private final RealtimeEventPublisher realtimeEvents;
 
     private final GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
 
@@ -55,7 +56,10 @@ public class DemandService {
                 .desiredTime(request.getDesiredTime())
                 .build();
 
-        return mapToDto(demandRepository.save(demand));
+        Demand saved = demandRepository.save(demand);
+        realtimeEvents.afterCommit(allUserEmails(), com.vaijunto.dto.RealtimeEventDto.create(
+                "DEMAND_CREATED", "DEMAND", saved.getId(), java.util.Map.of("demandId", saved.getId().toString())));
+        return mapToDto(saved);
     }
     @Transactional(readOnly = true)
     public List<DemandDto> findMine(String email) {
@@ -78,7 +82,8 @@ public class DemandService {
         demand.setOriginName(request.getOriginName()); demand.setOriginLocation(toPoint(request.getOriginLocation())); demand.setDestinationName(request.getDestinationName()); demand.setDestinationLocation(toPoint(request.getDestinationLocation())); demand.setDesiredTime(request.getDesiredTime());
         return mapToDto(demand);
     }
-    @Transactional public void cancelDemand(java.util.UUID id, String email) { Demand d = owned(id, email); if (d.getStatus() != com.vaijunto.domain.enums.DemandStatus.OPEN) throw new IllegalArgumentException("Use o fluxo de cancelamento da carona aceita."); d.setStatus(com.vaijunto.domain.enums.DemandStatus.CANCELLED); }
+    @Transactional public void cancelDemand(java.util.UUID id, String email) { Demand d = owned(id, email); if (d.getStatus() != com.vaijunto.domain.enums.DemandStatus.OPEN) throw new IllegalArgumentException("Use o fluxo de cancelamento da carona aceita."); d.setStatus(com.vaijunto.domain.enums.DemandStatus.CANCELLED); realtimeEvents.afterCommit(allUserEmails(), com.vaijunto.dto.RealtimeEventDto.create("DEMAND_CANCELLED", "DEMAND", d.getId(), java.util.Map.of("demandId", d.getId().toString()))); }
+    private java.util.List<String> allUserEmails() { return userRepository.findAll().stream().map(User::getEmail).filter(java.util.Objects::nonNull).toList(); }
     private Demand owned(java.util.UUID id, String email) { Demand d = demandRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Pedido não encontrado")); if (!d.getPassenger().getEmail().equals(email)) throw new org.springframework.security.access.AccessDeniedException("Sem permissão para alterar este pedido."); return d; }
     private boolean hasFatecEndpoint(String origin, String destination) { return (origin != null && origin.toUpperCase().contains("FATEC")) || (destination != null && destination.toUpperCase().contains("FATEC")); }
 

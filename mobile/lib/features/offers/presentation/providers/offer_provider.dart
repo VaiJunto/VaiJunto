@@ -36,6 +36,7 @@ class CreateOfferNotifier extends StateNotifier<AsyncValue<OfferModel?>> {
     required double price,
     required DateTime departureAt,
     required bool isFixed,
+    required List<int> daysOfWeek,
     required String vehicleId,
   }) async {
     state = const AsyncValue.loading();
@@ -50,6 +51,7 @@ class CreateOfferNotifier extends StateNotifier<AsyncValue<OfferModel?>> {
         price: price,
         departureAt: departureAt,
         isFixed: isFixed,
+        daysOfWeek: daysOfWeek,
         vehicleId: vehicleId,
       );
       state = AsyncValue.data(offer);

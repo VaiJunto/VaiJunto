@@ -55,14 +55,16 @@ class _DesktopAdminEntryScreenState
       await ref
           .read(secureStorageProvider)
           .saveAdminToken(response.data['token'] as String);
-      if (mounted)
+      if (mounted) {
         Navigator.of(context).pushReplacement(MaterialPageRoute(
             builder: (_) => _AdminOperationsPanel(
                 role: response.data['role'] as String? ?? 'ADMIN')));
+      }
     } on DioException catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() => _error = _message(
             e, 'Não foi possível confirmar as credenciais administrativas.'));
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -255,14 +257,17 @@ class _AdminBuildStamp extends StatelessWidget {
             Icon(Icons.cloud_done_outlined,
                 size: compact ? 13 : 15, color: scheme.tertiary),
             const SizedBox(width: 6),
-            Text(
-              'BUILD $kBuildLabel',
-              style: TextStyle(
-                color: scheme.tertiary,
-                fontFamily: 'IBMPlexMono',
-                fontWeight: FontWeight.w800,
-                letterSpacing: .5,
-                fontSize: compact ? 9 : 10,
+            Flexible(
+              child: Text(
+                'BUILD $kBuildLabel',
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: scheme.tertiary,
+                  fontFamily: 'IBMPlexMono',
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: .5,
+                  fontSize: compact ? 9 : 10,
+                ),
               ),
             ),
           ],
@@ -320,7 +325,7 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
         dio.get('/admin/newsletters'),
         if (_superAdmin) dio.get('/admin/accounts')
       ]);
-      if (mounted)
+      if (mounted) {
         setState(() {
           _users = responses[0].data as List<dynamic>;
           _reports = responses[1].data as List<dynamic>;
@@ -329,10 +334,12 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
           _newsletters = responses[4].data as List<dynamic>;
           _accounts = _superAdmin ? responses[5].data as List<dynamic> : [];
         });
+      }
     } on DioException catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(
             () => _error = _message(e, 'Não foi possível carregar o painel.'));
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -1276,11 +1283,12 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
       } else {
         await dio.delete('/admin/accounts/$id');
       }
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(active
                 ? 'Acesso de $address restaurado.'
                 : 'Acesso de $address excluído.')));
+      }
       await _refresh();
     } on DioException catch (e) {
       _showError(_message(
@@ -1735,9 +1743,10 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
         'newPassword': next.text,
         'totpCode': totp.text.trim()
       });
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Senha alterada com sucesso.')));
+      }
     } on DioException catch (e) {
       _showError(_message(e, 'Não foi possível alterar a senha.'));
     } finally {
@@ -1771,10 +1780,11 @@ class _AdminOperationsPanelState extends ConsumerState<_AdminOperationsPanel> {
                         child: const Text('Salvar'))
                   ]));
   void _showError(String text) {
-    if (mounted)
+    if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(text),
           backgroundColor: Theme.of(context).colorScheme.error));
+    }
   }
 
   @override
@@ -2693,9 +2703,13 @@ class _AdminColorPickerState extends State<_AdminColorPicker> {
                   style:
                       TextStyle(color: scheme.onSurfaceVariant, fontSize: 11)),
               const SizedBox(height: 8),
-              _NeoColorField(
-                  color: _selected,
-                  onChanged: (next) => _select(next, syncText: true))
+              SizedBox(
+                width: 480,
+                height: 188,
+                child: _NeoColorField(
+                    color: _selected,
+                    onChanged: (next) => _select(next, syncText: true)),
+              )
             ]))
       ]
     ]);
@@ -2916,8 +2930,9 @@ Future<T?> _showAdminDialog<T>({
 
 String _message(DioException error, String fallback) {
   final data = error.response?.data;
-  if (data is Map && data['message'] is String)
+  if (data is Map && data['message'] is String) {
     return data['message'] as String;
+  }
   return fallback;
 }
 

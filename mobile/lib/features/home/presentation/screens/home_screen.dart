@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -19,6 +20,9 @@ import '../../../offers/data/models/offer_model.dart';
 import '../../../demands/presentation/screens/create_demand_screen.dart';
 import '../../../notifications/presentation/notification_center_screen.dart';
 import '../../../notifications/data/services/notification_service.dart';
+import '../../../notifications/presentation/notification_destination_resolver.dart';
+import '../../../tracking/data/services/stomp_client_service.dart';
+import '../../../chat/presentation/providers/conversation_provider.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key, required this.user});
@@ -29,7 +33,8 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen>
+    with WidgetsBindingObserver {
   static const _titles = ['CARONAS', 'MINHAS CARONAS', 'CHAT', 'AJUSTES'];
   static const _codes = [
     'VJ//RIDES',
@@ -39,11 +44,74 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   ];
 
   int _currentIndex = 0;
+  StreamSubscription<RealtimeEvent>? _eventSubscription;
+  StreamSubscription<Map<String, dynamic>>? _pushSubscription;
+  StreamSubscription<Map<String, dynamic>>? _foregroundPushSubscription;
+  Timer? _fallbackTimer;
+  AppLifecycleState _lifecycle = AppLifecycleState.resumed;
 
   @override
   void initState() {
     super.initState();
-    Future.microtask(() => ref.read(notificationServiceProvider).init());
+    WidgetsBinding.instance.addObserver(this);
+    Future.microtask(_startLiveUpdates);
+  }
+
+  Future<void> _startLiveUpdates() async {
+    final notifications = ref.read(notificationServiceProvider);
+    await notifications.init();
+    if (!mounted) return;
+    _pushSubscription = notifications.openedMessages.listen((data) {
+      if (mounted) NotificationDestinationResolver.navigate(context, ref, data);
+    });
+    _foregroundPushSubscription = notifications.foregroundMessages.listen((_) {
+      if (mounted) _refreshAll();
+    });
+    final socket = ref.read(stompClientProvider);
+    _eventSubscription = socket.events.listen((event) {
+      if (!mounted) return;
+      final conversationId = event.payload['conversationId']?.toString();
+      if (conversationId != null) {
+        ref.invalidate(conversationMessagesProvider(conversationId));
+      }
+      _refreshAll();
+    });
+    await socket.connect();
+    _fallbackTimer = Timer.periodic(const Duration(seconds: 45), (_) {
+      if (_lifecycle == AppLifecycleState.resumed && !socket.isConnected) {
+        _refreshAll();
+        socket.connect();
+      }
+    });
+    _refreshAll();
+  }
+
+  void _refreshAll() {
+    ref.invalidate(myOffersProvider);
+    ref.invalidate(myDemandsProvider);
+    ref.invalidate(nearbyOffersProvider);
+    ref.invalidate(nearbyDemandsProvider);
+    ref.invalidate(conversationsProvider);
+    ref.invalidate(notificationsProvider);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _lifecycle = state;
+    if (state == AppLifecycleState.resumed) {
+      _refreshAll();
+      ref.read(stompClientProvider).connect();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _eventSubscription?.cancel();
+    _pushSubscription?.cancel();
+    _foregroundPushSubscription?.cancel();
+    _fallbackTimer?.cancel();
+    super.dispose();
   }
 
   void _openCreate(CreateRideMode mode, {OfferModel? offer}) {

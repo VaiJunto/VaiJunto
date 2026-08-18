@@ -13,6 +13,9 @@ import com.vaijunto.repository.NotificationRepository;
 import com.vaijunto.repository.UserRepository;
 import com.vaijunto.repository.NotificationDeviceTokenRepository;
 import com.vaijunto.exception.ApiException;
+import com.vaijunto.dto.RealtimeEventDto;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -30,18 +33,24 @@ public class NotificationService {
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
     private final NotificationDeviceTokenRepository deviceTokens;
+    private final RealtimeEventPublisher realtimeEvents;
+    private final ObjectMapper objectMapper;
 
     @Transactional
     public void createAndSendNotification(UUID userId, String title, String body, String type, String payloadJson, String deviceToken) {
         User user = userRepository.findById(userId).orElse(null);
         if (user == null) return;
 
+        var payload = normalizePayload(type, payloadJson);
+        String normalizedPayload;
+        try { normalizedPayload = objectMapper.writeValueAsString(payload); }
+        catch (Exception ignored) { normalizedPayload = "{\"targetType\":\"HOME\"}"; }
         Notification notification = Notification.builder()
                 .user(user)
                 .type(type)
                 .title(title)
                 .body(body)
-                .payload(payloadJson)
+                .payload(normalizedPayload)
                 .isRead(false)
                 .build();
         
@@ -50,11 +59,16 @@ public class NotificationService {
         if (deviceToken != null && !deviceToken.isBlank()) registerDeviceToken(userId, deviceToken);
         if (!("CHAT_MESSAGE".equals(type) && Boolean.TRUE.equals(user.getNotificationMuteChat()))) {
             String pushBody = Boolean.TRUE.equals(user.getNotificationHideContent()) ? "Você tem uma nova notificação do VaiJunto." : body;
-            deviceTokens.findByUserId(userId).forEach(token -> sendPushNotification(token.getToken(), title, pushBody, type));
+            deviceTokens.findByUserId(userId).forEach(token -> sendPushNotification(token.getToken(), title, pushBody, type, payload));
         }
+        var eventPayload = new java.util.LinkedHashMap<String,Object>(payload);
+        eventPayload.put("notificationId", notification.getId().toString());
+        eventPayload.put("notificationType", type);
+        realtimeEvents.afterCommit(List.of(user.getEmail()), RealtimeEventDto.create(
+                "NOTIFICATION_CREATED", "NOTIFICATION", notification.getId(), eventPayload));
     }
 
-    private void sendPushNotification(String deviceToken, String title, String body, String type) {
+    private void sendPushNotification(String deviceToken, String title, String body, String type, java.util.Map<String,Object> payload) {
         if (deviceToken == null || deviceToken.isEmpty()) {
             return; // Usuário sem token de dispositivo
         }
@@ -66,6 +80,8 @@ public class NotificationService {
                         .putData("title", title)
                         .putData("body", body)
                         .putData("type", type)
+                        .putAllData(payload.entrySet().stream().filter(e -> e.getValue() != null)
+                                .collect(java.util.stream.Collectors.toMap(java.util.Map.Entry::getKey, e -> e.getValue().toString())))
                         .build();
 
                 String response = FirebaseMessaging.getInstance().send(message);
@@ -76,6 +92,28 @@ public class NotificationService {
         } catch (Exception e) {
             log.error("Falha ao enviar notificação Push (FCM): {}", e.getMessage());
         }
+    }
+
+    private java.util.Map<String,Object> normalizePayload(String type, String payloadJson) {
+        java.util.Map<String,Object> payload = new java.util.LinkedHashMap<>();
+        try {
+            if (payloadJson != null && !payloadJson.isBlank()) {
+                payload.putAll(objectMapper.readValue(payloadJson, new TypeReference<java.util.Map<String,Object>>() {}));
+            }
+        } catch (Exception error) {
+            log.warn("Payload de notificacao invalido para tipo={}", type);
+        }
+        payload.putIfAbsent("targetType", targetType(type, payload));
+        return payload;
+    }
+
+    private String targetType(String type, java.util.Map<String,Object> payload) {
+        if (payload.containsKey("conversationId") || java.util.Set.of("CHAT_MESSAGE", "ADMIN_MESSAGE").contains(type)) return "CONVERSATION";
+        if (payload.containsKey("tripId") || type.startsWith("RIDE_")) return "TRIP";
+        if (payload.containsKey("demandId") || type.startsWith("DEMAND_")) return "DEMAND";
+        if (payload.containsKey("newsletterId") || "ADMIN_NEWSLETTER".equals(type)) return "NEWSLETTER";
+        if (type.contains("MODERATION") || type.contains("VERIFICATION") || type.contains("OFFICIAL")) return "SETTINGS";
+        return "HOME";
     }
 
     public List<NotificationDto> getNotifications(String email) {
