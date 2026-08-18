@@ -14,25 +14,31 @@
     Em vez de compilar APK, roda no Chrome com hot reload (loop bem mais rápido
     para mexer em UI). Não precisa de celular nem emulador.
 
-.PARAMETER SkipBackend
-    Não mexe no backend (útil se você já está com ele rodando em outro terminal).
+.PARAMETER RemoteDb
+    Conecta o backend local ao banco de PRODUCAO via tunel SSH (127.0.0.1:5433).
+    Desativa automaticamente as migrations do Flyway por seguranca.
 
 .EXAMPLE
     .\dev.ps1              # build + instala no device + abre
     .\dev.ps1 -Web         # roda no Chrome com hot reload
+    .\dev.ps1 -Web -RemoteDb # roda no Chrome conectando ao banco de PRODUCAO
 #>
 param(
     [switch]$Web,
-    [switch]$SkipBackend
+    [switch]$SkipBackend,
+    [switch]$RemoteDb
 )
 
 $ErrorActionPreference = "Stop"
 
 $Root       = $PSScriptRoot
-$FlutterBin = "C:\Users\Gabriel\dev\flutter\bin"
-$Jdk17      = "C:\Users\Gabriel\dev\jdk17\jdk-17.0.13+11"
-$Maven      = "C:\Users\Gabriel\dev\maven\apache-maven-3.9.9\bin\mvn.cmd"
-$Sdk        = "C:\Users\Gabriel\AppData\Local\Android\Sdk"
+$UserDev    = "$env:USERPROFILE\dev"
+
+# Busca dinâmica das ferramentas no perfil do usuário atual, PATH ou fallback Gabriel
+$FlutterBin = if (Test-Path "$UserDev\flutter\bin") { "$UserDev\flutter\bin" } elseif (Get-Command flutter -ErrorAction SilentlyContinue) { Split-Path (Get-Command flutter).Source } else { "$UserDev\flutter\bin" }
+$Jdk17      = if (Test-Path "$UserDev\jdk17\jdk-17.0.13+11") { "$UserDev\jdk17\jdk-17.0.13+11" } elseif (Test-Path "$UserDev\jdk17") { "$UserDev\jdk17" } else { "$UserDev\jdk17" }
+$Maven      = if (Test-Path "$UserDev\maven\apache-maven-3.9.9\bin\mvn.cmd") { "$UserDev\maven\apache-maven-3.9.9\bin\mvn.cmd" } elseif (Test-Path "$UserDev\maven\bin\mvn.cmd") { "$UserDev\maven\bin\mvn.cmd" } elseif (Get-Command mvn -ErrorAction SilentlyContinue) { (Get-Command mvn).Source } else { "$UserDev\maven\apache-maven-3.9.9\bin\mvn.cmd" }
+$Sdk        = if (Test-Path "$env:LOCALAPPDATA\Android\Sdk") { "$env:LOCALAPPDATA\Android\Sdk" } else { "C:\Users\Gabriel\AppData\Local\Android\Sdk" }
 $Adb        = "$Sdk\platform-tools\adb.exe"
 $AppId      = "com.vaijunto.mobile"
 
@@ -51,9 +57,22 @@ function Test-Backend {
     } catch { return $false }
 }
 
-# Carrega backend\.env.local (MAIL_USERNAME/MAIL_PASSWORD) se existir, para o
-# envio de e-mail de confirmação funcionar. Nunca commitado (está no
-# .gitignore) — veja backend\.env.local.example para o formato.
+function Test-PortOpen($targetHost, $targetPort) {
+    try {
+        $client = New-Object System.Net.Sockets.TcpClient
+        $asyncResult = $client.BeginConnect($targetHost, $targetPort, $null, $null)
+        $wait = $asyncResult.AsyncWaitHandle.WaitOne(1000, $false)
+        if (-not $wait) {
+            $client.Close()
+            return $false
+        }
+        $client.EndConnect($asyncResult)
+        $client.Close()
+        return $true
+    } catch { return $false }
+}
+
+# Carrega arquivo .env no ambiente atual
 function Import-DotEnv($path) {
     if (-not (Test-Path $path)) { return }
     Get-Content $path | ForEach-Object {
@@ -66,15 +85,51 @@ function Import-DotEnv($path) {
 
 # ---------------------------------------------------------------- Postgres --
 if (-not $SkipBackend) {
-    Write-Step "Postgres"
-    $pg = Get-Service "postgresql-x64-18" -ErrorAction SilentlyContinue
-    if (-not $pg) {
-        Write-Warn "Servico postgresql-x64-18 nao encontrado. Pulei."
-    } elseif ($pg.Status -ne "Running") {
-        Start-Service $pg.Name
-        Write-Ok "Iniciado."
+    Import-DotEnv "$Root\backend\.env.local"
+
+    if ($RemoteDb) {
+        Write-Step "Postgres (PRODUCAO)"
+
+        # Carrega credenciais remotas se existirem
+        Import-DotEnv "$Root\backend\.env.remote"
+
+        # Defaults de credenciais do tunel SSH se nao definidos no .env.remote
+        if (-not $env:DB_HOST) { $env:DB_HOST = "127.0.0.1" }
+        if (-not $env:DB_PORT) { $env:DB_PORT = "5433" }
+        if (-not $env:DB_NAME) { $env:DB_NAME = "vaijunto" }
+        if (-not $env:DB_USER) { $env:DB_USER = "vaijunto" }
+        if (-not $env:DB_PASS) { $env:DB_PASS = "fV5n7VOsZe8RToakyOrjxdbQ09X3LymsE4WvkNwxJLM=" }
+
+        # Trava obrigatoria de seguranca: desativa Flyway para nao aplicar migrations em producao
+        $env:FLYWAY_ENABLED = "false"
+        $env:SPRING_FLYWAY_ENABLED = "false"
+
+        # Checa se o tunel SSH (127.0.0.1:5433) esta ativo
+        $tunnelPort = [int]$env:DB_PORT
+        if (-not (Test-PortOpen "127.0.0.1" $tunnelPort)) {
+            Write-Host "   [ERRO] Tunel SSH nao encontrado na porta $tunnelPort!" -ForegroundColor Red
+            Write-Host "   Abra o tunel SSH em outro terminal executando:" -ForegroundColor Yellow
+            Write-Host "   ssh -N -L 5433:127.0.0.1:5432 napo@api.vaijunto.app.br" -ForegroundColor Cyan
+            throw "Tunel SSH para producao nao esta ativo na porta $tunnelPort."
+        }
+
+        Write-Host "   !!! ATENCAO: CONECTADO AO BANCO DE PRODUCAO !!!" -ForegroundColor Red
+        Write-Ok "Tunel SSH detectado na porta $tunnelPort."
+        Write-Ok "Flyway desativado (migrations bloqueadas)."
+    } elseif (-not $env:DB_HOST -or $env:DB_HOST -eq "localhost" -or $env:DB_HOST -eq "127.0.0.1") {
+        Write-Step "Postgres (Local)"
+        $pg = Get-Service "postgresql-x64-18" -ErrorAction SilentlyContinue
+        if (-not $pg) {
+            Write-Warn "Servico postgresql-x64-18 nao encontrado. Pulei."
+        } elseif ($pg.Status -ne "Running") {
+            Start-Service $pg.Name
+            Write-Ok "Iniciado."
+        } else {
+            Write-Ok "Ja rodando."
+        }
     } else {
-        Write-Ok "Ja rodando."
+        Write-Step "Postgres (Nuvem)"
+        Write-Ok "Conectando ao banco em: $env:DB_HOST"
     }
 
     # ------------------------------------------------------------- Backend --
@@ -82,7 +137,6 @@ if (-not $SkipBackend) {
     if (Test-Backend) {
         Write-Ok "Ja no ar em :8080."
     } else {
-        Import-DotEnv "$Root\backend\.env.local"
         if (-not $env:MAIL_USERNAME) {
             Write-Warn "MAIL_USERNAME nao configurado (backend\.env.local) - envio de e-mail vai falhar silenciosamente."
         }
