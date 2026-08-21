@@ -7,7 +7,7 @@ WORKDIR /app
 # API_BASE_URL de producao como build-arg: o valor e compilado dentro do
 # main.dart.js (String.fromEnvironment e resolvido em build-time, nao da
 # para trocar depois so reiniciando o container). Ver mobile/lib/core/network/api_client.dart.
-ARG API_BASE_URL=https://api.vaijunto.app.br/api/v1
+ARG API_BASE_URL=https://vaijunto.app.br/api/v1
 ARG WS_BASE_URL=wss://api.vaijunto.app.br/ws-tracking
 ARG BUILD_REVISION=local
 
@@ -16,6 +16,7 @@ RUN flutter pub get
 
 COPY . .
 RUN flutter build web --release \
+    --pwa-strategy=none \
     --dart-define=API_BASE_URL=${API_BASE_URL} \
     --dart-define=WS_BASE_URL=${WS_BASE_URL} \
     --dart-define=BUILD_REVISION=${BUILD_REVISION}
@@ -23,6 +24,9 @@ RUN flutter build web --release \
 FROM nginx:1.27-alpine
 
 COPY --from=build /app/build/web /usr/share/nginx/html
+# O Flutter ainda gera um arquivo vazio com --pwa-strategy=none. Servir este
+# worker de limpeza faz os navegadores que ja tinham o PWA antigo remove-lo.
+COPY --from=build /app/web/flutter_service_worker_cleanup.js /usr/share/nginx/html/flutter_service_worker.js
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80

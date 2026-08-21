@@ -35,12 +35,50 @@
 </head>
 <body>
   <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/firebase-messaging-sw.js', {
-        scope: '/firebase-cloud-messaging-push-scope'
-      });
-    }
+    (async () => {
+      let controlledByFlutter = false;
+      if ('serviceWorker' in navigator) {
+        controlledByFlutter = navigator.serviceWorker.controller &&
+            navigator.serviceWorker.controller.scriptURL
+                .includes('/flutter_service_worker.js');
+        try {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          const flutterWorkers = registrations.filter((registration) => {
+            const worker = registration.active ||
+                registration.waiting || registration.installing;
+            return worker && worker.scriptURL
+                .includes('/flutter_service_worker.js');
+          });
+
+          await Promise.all(flutterWorkers.map((worker) => worker.unregister()));
+
+          if ('caches' in window) {
+            const cacheNames = await caches.keys();
+            await Promise.all(
+              cacheNames
+                  .filter((name) => name.startsWith('flutter-'))
+                  .map((name) => caches.delete(name)),
+            );
+          }
+        } catch (_) {}
+
+        if (controlledByFlutter &&
+            sessionStorage.getItem('vj-sw-cleanup') !== 'done') {
+          sessionStorage.setItem('vj-sw-cleanup', 'done');
+          window.location.reload();
+          return;
+        }
+        sessionStorage.removeItem('vj-sw-cleanup');
+
+        navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+          scope: '/firebase-cloud-messaging-push-scope'
+        }).catch(() => {});
+      }
+
+      const bootstrap = document.createElement('script');
+      bootstrap.src = 'flutter_bootstrap.js';
+      document.body.appendChild(bootstrap);
+    })();
   </script>
-  <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
