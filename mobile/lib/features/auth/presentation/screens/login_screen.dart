@@ -36,13 +36,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     FocusScope.of(context).unfocus();
     if (_formKey.currentState!.validate()) {
-      ref.read(authStateProvider.notifier).login(
+      final challengeToken = await ref.read(authStateProvider.notifier).login(
             _emailController.text.trim(),
             _passwordController.text,
           );
+      if (!mounted || challengeToken == null) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => DeviceVerificationScreen(
+            challengeToken: challengeToken,
+          ),
+        ),
+      );
     }
   }
 
@@ -61,16 +69,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     ref.listen(authStateProvider, (previous, next) {
       next.whenOrNull(
         error: (error, _) {
-          if (error is DeviceVerificationRequired) {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => DeviceVerificationScreen(
-                  challengeToken: error.challengeToken,
-                ),
-              ),
-            );
-            return;
-          }
           if (error is ApiException && error.code == 'EMAIL_NOT_VERIFIED') {
             Navigator.of(context).push(
               MaterialPageRoute(

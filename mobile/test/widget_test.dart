@@ -9,10 +9,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vaijunto/core/app_version.dart';
 import 'package:vaijunto/core/theme/neo_brutal_theme.dart';
 import 'package:vaijunto/core/network/api_client.dart';
+import 'package:vaijunto/core/storage/secure_storage.dart';
 import 'package:vaijunto/core/ui/neo_bottom_nav_bar.dart';
 import 'package:vaijunto/core/ui/neo_button.dart';
 import 'package:vaijunto/core/ui/neo_street_backdrop.dart';
 import 'package:vaijunto/features/auth/data/models/user_model.dart';
+import 'package:vaijunto/features/auth/data/repositories/auth_repository.dart';
+import 'package:vaijunto/features/auth/presentation/screens/device_verification_screen.dart';
 import 'package:vaijunto/features/auth/presentation/screens/login_screen.dart';
 import 'package:vaijunto/features/auth/presentation/screens/register_screen.dart';
 import 'package:vaijunto/features/auth/presentation/widgets/password_requirements.dart';
@@ -211,6 +214,38 @@ void main() {
     );
   });
 
+  testWidgets('login abre confirmacao quando o backend exige novo dispositivo',
+      (tester) async {
+    FlutterSecureStorage.setMockInitialValues({});
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(
+            _DeviceChallengeAuthRepository(),
+          ),
+        ],
+        child: MaterialApp(
+          theme: buildNeoBrutalTheme(Brightness.dark),
+          builder: _disableAnimations,
+          home: const LoginScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byType(TextFormField).first,
+      'gabriel@aluno.cps.sp.gov.br',
+    );
+    await tester.enterText(find.byType(TextFormField).last, 'SenhaValida1');
+    await tester.tap(find.widgetWithText(NeoButton, 'ENTRAR'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(DeviceVerificationScreen), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   test('mapa vivo normaliza o fim para o início do ciclo', () {
     expect(neoLoopProgress(0), 0);
     expect(neoLoopProgress(1), 0);
@@ -390,6 +425,24 @@ Widget _disableAnimations(BuildContext context, Widget? child) {
     data: MediaQuery.of(context).copyWith(disableAnimations: true),
     child: child!,
   );
+}
+
+class _DeviceChallengeAuthRepository extends AuthRepository {
+  _DeviceChallengeAuthRepository()
+      : super(
+          Dio(),
+          SecureStorage(const FlutterSecureStorage()),
+        );
+
+  @override
+  Future<LoginResult> login(String email, String password) async {
+    return LoginResult.fromJson({
+      'deviceVerificationRequired': true,
+      'challengeToken': 'challenge-token',
+      'token': null,
+      'user': null,
+    });
+  }
 }
 
 class _AdminFixtureAdapter implements HttpClientAdapter {

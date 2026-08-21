@@ -7,7 +7,7 @@
 ///
 /// Formato `major.minor.patch.build`, espelhado no `version:` do pubspec.yaml
 /// como `major.minor.patch+build`. Os dois precisam andar juntos.
-const String kAppVersion = '1.17.0.2';
+const String kAppVersion = '1.17.0.3';
 
 /// Revisao injetada pelo build de producao para identificar exatamente qual
 /// commit esta rodando. Builds locais exibem `local`.

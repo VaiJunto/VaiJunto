@@ -4,15 +4,6 @@ import '../../../../core/network/api_exception.dart';
 import '../../data/models/user_model.dart';
 import '../../data/repositories/auth_repository.dart';
 
-/// Sinaliza pro [LoginScreen] navegar pra tela de confirmação de device, em
-/// vez de mostrar um erro. Não é uma falha de fato — o backend só está
-/// pedindo mais um passo antes de emitir a sessão (device novo no login).
-class DeviceVerificationRequired implements Exception {
-  const DeviceVerificationRequired(this.challengeToken);
-
-  final String challengeToken;
-}
-
 final authStateProvider =
     StateNotifierProvider<AuthNotifier, AsyncValue<UserModel?>>((ref) {
   return AuthNotifier(ref.watch(authRepositoryProvider));
@@ -29,16 +20,16 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserModel?>> {
 
   AuthNotifier(this._repository) : super(const AsyncValue.data(null));
 
-  Future<void> login(String email, String password) async {
+  /// Retorna o token do desafio quando o backend exige confirmação deste
+  /// dispositivo. Esse resultado esperado não deve virar [AsyncValue.error]:
+  /// a tela usa o token para abrir diretamente o passo de verificação.
+  Future<String?> login(String email, String password) async {
     state = const AsyncValue.loading();
     try {
       final result = await _repository.login(email, password);
       if (result.deviceVerificationRequired) {
-        state = AsyncValue.error(
-          DeviceVerificationRequired(result.challengeToken!),
-          StackTrace.current,
-        );
-        return;
+        state = const AsyncValue.data(null);
+        return result.challengeToken!;
       }
       state = AsyncValue.data(result.user);
     } on DioException catch (e, st) {
@@ -46,6 +37,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserModel?>> {
     } catch (e, st) {
       state = AsyncValue.error(e, st);
     }
+    return null;
   }
 
   /// Chamada pela tela de verificação de e-mail: o código confirmado JÁ é o
