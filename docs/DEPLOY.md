@@ -15,8 +15,9 @@ push/merge na main
         → push para ghcr.io/vaijunto/vaijunto-backend:latest
                     e ghcr.io/vaijunto/vaijunto-backend:sha-<commit>
     → build-web: imagem Docker do Flutter Web/PWA (contexto: mobile/, Dockerfile: mobile/Dockerfile)
-        → build-arg API_BASE_URL=https://api.vaijunto.app.br/api/v1 (compilado no bundle,
-          ver mobile/lib/core/network/api_client.dart)
+        → build-arg API_BASE_URL=https://vaijunto.app.br/api/v1 (mesma origem do PWA;
+          o Nginx encaminha /api/ para o backend na rede interna do Compose)
+        → build-arg WS_BASE_URL=wss://api.vaijunto.app.br/ws-tracking
         → push para ghcr.io/vaijunto/vaijunto-web:latest
                     e ghcr.io/vaijunto/vaijunto-web:sha-<commit>
     → aguarda aprovação do environment "production" (depende dos dois builds acima)
@@ -92,9 +93,9 @@ services:
     image: ${WEB_IMAGE}
     container_name: vaijunto-web
     restart: unless-stopped
-    # SEM "depends_on: backend" — o PWA e estático (nginx servindo o build do
-    # Flutter Web), a URL da API ja foi compilada no bundle via API_BASE_URL
-    # (build-arg do mobile/Dockerfile). Não precisa do backend no ar pra subir.
+    # O Nginx serve o Flutter Web e encaminha /api/ para o serviço "backend"
+    # pela rede interna do Compose. O container pode subir sem depends_on;
+    # enquanto o backend reinicia, as chamadas recebem 502 temporariamente.
     ports:
       - "127.0.0.1:8081:80"   # só loopback — mesmo padrão do backend, Caddy expõe pra internet
 ```
@@ -337,7 +338,9 @@ flutter create --platforms=web .
 Build local para conferir antes de depender do CI:
 
 ```bash
-flutter build web --release --dart-define=API_BASE_URL=https://api.vaijunto.app.br/api/v1
+flutter build web --release \
+  --dart-define=API_BASE_URL=https://vaijunto.app.br/api/v1 \
+  --dart-define=WS_BASE_URL=wss://api.vaijunto.app.br/ws-tracking
 ```
 
 Saída em `mobile/build/web/`. Em produção esse mesmo comando roda dentro do
@@ -357,7 +360,7 @@ configurado ainda, então mantenha essas features atrás de um fallback
 ## 6. Pendências que exigem ação manual (fora do alcance deste repositório)
 
 - Gerar `mobile/web/` (`flutter create --platforms=web .`) e rodar
-  `flutter build web --release --dart-define=API_BASE_URL=https://api.vaijunto.app.br/api/v1`
+  `flutter build web --release --dart-define=API_BASE_URL=https://vaijunto.app.br/api/v1`
   localmente pelo menos uma vez antes do primeiro deploy, para pegar qualquer
   incompatibilidade de plugin com web cedo (fora do alcance deste ambiente —
   sem Flutter instalado aqui).

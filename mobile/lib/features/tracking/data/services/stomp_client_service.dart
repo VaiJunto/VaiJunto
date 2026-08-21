@@ -65,6 +65,9 @@ class StompClientService {
   bool get isConnected => _client?.connected ?? false;
 
   static String get wsUrl {
+    const configuredUrl = String.fromEnvironment('WS_BASE_URL');
+    if (configuredUrl.isNotEmpty) return configuredUrl;
+
     final apiUri = Uri.parse(ApiClient.baseUrl);
     return apiUri
         .replace(

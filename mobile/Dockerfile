@@ -8,6 +8,7 @@ WORKDIR /app
 # main.dart.js (String.fromEnvironment e resolvido em build-time, nao da
 # para trocar depois so reiniciando o container). Ver mobile/lib/core/network/api_client.dart.
 ARG API_BASE_URL=https://api.vaijunto.app.br/api/v1
+ARG WS_BASE_URL=wss://api.vaijunto.app.br/ws-tracking
 ARG BUILD_REVISION=local
 
 COPY pubspec.yaml pubspec.lock* ./
@@ -16,6 +17,7 @@ RUN flutter pub get
 COPY . .
 RUN flutter build web --release \
     --dart-define=API_BASE_URL=${API_BASE_URL} \
+    --dart-define=WS_BASE_URL=${WS_BASE_URL} \
     --dart-define=BUILD_REVISION=${BUILD_REVISION}
 
 FROM nginx:1.27-alpine
