@@ -55,6 +55,8 @@ class ApiException implements Exception {
         DioExceptionType.badCertificate =>
           'O certificado de segurança da API não pôde ser validado.',
         DioExceptionType.cancel => 'A requisição foi cancelada.',
+        DioExceptionType.unknown =>
+          'O navegador não conseguiu preparar a chamada da API. Atualize a página e tente novamente.',
         _ => switch (response?.statusCode ?? 0) {
             0 =>
               'A API não respondeu. Confira o endereço configurado e o bloqueio de CORS no navegador.',
@@ -69,6 +71,7 @@ class ApiException implements Exception {
           },
       },
       statusCode: response?.statusCode,
+      code: e.type == DioExceptionType.unknown ? 'CLIENT_REQUEST_FAILED' : null,
       correlationId: correlationId,
     );
   }

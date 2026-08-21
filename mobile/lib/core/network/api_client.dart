@@ -34,6 +34,14 @@ class ApiClient {
 
     dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
+        // Login, cadastro e confirmacoes sao rotas publicas. Alem de nao
+        // precisarem de Authorization, elas nao podem depender da leitura do
+        // token criptografado: um valor local antigo/corrompido impediria a
+        // requisicao de login de sequer sair do navegador.
+        if (_isPublicAuthPath(options.path)) {
+          return handler.next(options);
+        }
+
         final correlationId =
             '${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}-${Random.secure().nextInt(1 << 32).toRadixString(36)}';
         options.headers['X-Correlation-Id'] = correlationId;
@@ -68,4 +76,17 @@ class ApiClient {
       },
     ));
   }
+}
+
+bool _isPublicAuthPath(String path) {
+  const publicPaths = <String>{
+    '/auth/login',
+    '/auth/register',
+    '/auth/verify-email',
+    '/auth/resend-verification',
+    '/auth/verify-device',
+    '/auth/resend-device-code',
+    '/admin/auth/login',
+  };
+  return publicPaths.contains(Uri.parse(path).path);
 }
